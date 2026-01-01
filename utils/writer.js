@@ -1,13 +1,13 @@
-var ResponsePayload = function (code, payload) {
+const ResponsePayload = function (code, payload) {
     this.code = code;
     this.payload = payload;
 };
 
 exports.respondWithCode = (code, payload) => new ResponsePayload(code, payload);
 
-var writeJson = (exports.writeJson = (response, argument1, argument2) => {
-    var code;
-    var payload;
+const writeJson = (response, argument1, argument2) => {
+    let code;
+    let payload;
 
     if (argument1 && argument1 instanceof ResponsePayload) {
         writeJson(response, argument1.payload, argument1.code);
@@ -37,4 +37,6 @@ var writeJson = (exports.writeJson = (response, argument1, argument2) => {
     response.status(code);
     response.setHeader("Content-Type", "application/json");
     response.json(payload);
-});
+};
+
+exports.writeJson = writeJson;
