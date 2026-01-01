@@ -3,6 +3,7 @@
     "private": true,
     "type": "commonjs",
     "scripts": {
+        "build": "babel . --extensions \".js\" --ignore \"./lib/**\",\"./node_modules/**\" --out-dir ./lib",
         "test": "node -e \"console.log('no tests yet')\""
     },
     "dependencies": {

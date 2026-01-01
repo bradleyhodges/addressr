@@ -4,8 +4,9 @@
     "type": "commonjs",
     "main": "server.js",
     "scripts": {
-        "dev": "node server.js",
-        "start": "node server.js",
+        "dev": "babel-node server.js",
+        "start": "babel-node server.js",
+        "build": "babel . --extensions \".js\" --ignore \"./lib/**\",\"./node_modules/**\" --out-dir ./lib",
         "test": "node -e \"console.log('no tests yet')\""
     },
     "dependencies": {
