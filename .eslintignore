@@ -1,4 +1,4 @@
-nodemodules/**/*
+node_modules/**/*
 target/**/*
 coverage/**
 test-results/**
