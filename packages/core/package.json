@@ -3,7 +3,9 @@
     "private": true,
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsc -p tsconfig.json",
         "test": "node -e \"console.log('no tests yet')\"",
@@ -13,8 +15,8 @@
         "progress": "^2.0.3"
     },
     "devDependencies": {
-        "@types/express": "^5.0.0",
-        "@types/node": "^22.10.1",
+        "@types/express": "^5.0.6",
+        "@types/node": "^22.19.3",
         "@types/progress": "^2.0.7"
     }
 }
