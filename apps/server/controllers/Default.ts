@@ -1,5 +1,5 @@
-import type { Request, Response } from "express";
 import { writeJson } from "@repo/addressr-core";
+import type { Request, Response } from "express";
 import { getApiRoot as fetchApiRoot } from "../service/DefaultService";
 
 type SwaggerRequest = Request & {

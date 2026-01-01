@@ -1,5 +1,5 @@
-import * as dotenv from "dotenv";
 import { version } from "@repo/addressr-core/version";
+import * as dotenv from "dotenv";
 
 /**
  * Load the environment variables

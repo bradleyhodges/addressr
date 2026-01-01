@@ -4,9 +4,7 @@
     "type": "commonjs",
     "main": "dist/elasticsearch.js",
     "types": "dist/elasticsearch.d.ts",
-    "files": [
-        "dist"
-    ],
+    "files": ["dist"],
     "exports": {
         ".": "./dist/elasticsearch.js",
         "./elasticsearch": "./dist/elasticsearch.js"

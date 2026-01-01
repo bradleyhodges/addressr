@@ -1,6 +1,6 @@
-import type { Request, Response } from "express";
 import { writeJson } from "@repo/addressr-core";
 import debug from "debug";
+import type { Request, Response } from "express";
 import {
     getAddress as fetchAddress,
     getAddresses as fetchAddresses,

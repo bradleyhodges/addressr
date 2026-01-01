@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
+import { type Server, createServer } from "node:http";
 import * as path from "node:path";
 import debug from "debug";
 import * as express from "express";

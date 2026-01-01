@@ -1,5 +1,5 @@
-import debug from "debug";
 import { esConnect } from "@repo/addressr-client/elasticsearch";
+import debug from "debug";
 import { loadGnaf } from "./service/address-service";
 import { printVersion } from "./service/printVersion";
 

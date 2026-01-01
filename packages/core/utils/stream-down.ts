@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import { get } from "node:https";
 import type { IncomingMessage } from "node:http";
+import { get } from "node:https";
 import * as path from "node:path";
 import { parse } from "node:url";
 

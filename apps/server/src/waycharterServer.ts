@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createServer, type Server } from "node:http";
+import { type Server, createServer } from "node:http";
 import { WayCharter } from "@mountainpass/waycharter";
 import { version } from "@repo/addressr-core/version";
 import debug from "debug";

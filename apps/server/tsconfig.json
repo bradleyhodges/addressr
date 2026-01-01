@@ -11,5 +11,6 @@
         "checkJs": false,
         "types": ["node"]
     },
-    "include": ["**/*.js", "**/*.ts"]
+    "include": ["**/*.js", "**/*.ts"],
+    "exclude": ["service/address-service.js"]
 }
