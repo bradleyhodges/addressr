@@ -1,5 +1,7 @@
 {
     "$schema": "https://turbo.build/schema.json",
+    "ui": "tui",
+    "globalDependencies": [".babelrc"],
     "pipeline": {
         "build": {
             "dependsOn": ["^build"],
@@ -16,7 +18,12 @@
         },
         "ci:publish": {
             "dependsOn": ["build"]
+        },
+        "clean": {
+            "cache": false
+        },
+        "//#clean": {
+            "cache": false
         }
-    },
-    "globalDependencies": [".babelrc"]
+    }
 }
