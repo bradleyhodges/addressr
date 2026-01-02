@@ -1,7 +1,7 @@
 {
     "name": "@bradleyhodges/addresskit",
     "version": "2.0.0",
-    "description": "Australian Address Validation, Search and Autocomplete",
+    "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
     "packageManager": "pnpm@10.22.0",
     "publishConfig": {
         "access": "public"
@@ -145,7 +145,7 @@
         "geocoding",
         "Geo::StreetAddress:AU"
     ],
-    "license": "Apache-2.0",
+    "license": "GPL-2.0-only",
     "private": true,
     "dependencies": {
         "@changesets/cli": "^2.29.8",
