@@ -532,6 +532,34 @@ const computeDocumentHash = (doc: Record<string, unknown>): string => {
 };
 
 /**
+ * Progress information for address indexing.
+ */
+interface IndexingProgress {
+    /** Number of addresses processed so far */
+    processed: number;
+    /** Total addresses to process */
+    total: number;
+    /** Processing speed in addresses per second */
+    addressesPerSecond: number;
+    /** Estimated time remaining in seconds */
+    etaSeconds: number;
+    /** Percentage complete (0-100) */
+    percentComplete: number;
+}
+
+/**
+ * Options for loading GNAF addresses.
+ */
+interface LoadGNAFAddressOptions {
+    /** Whether to refresh the index after each chunk */
+    refresh?: boolean;
+    /** Callback for progress updates */
+    onProgress?: (progress: IndexingProgress) => void;
+    /** Progress update interval in milliseconds (default: 250ms) */
+    progressInterval?: number;
+}
+
+/**
  * Loads the GNAF address details into the index.
  *
  * This function implements several performance optimizations:
@@ -545,8 +573,7 @@ const computeDocumentHash = (doc: Record<string, unknown>): string => {
  * @param file - The path to the GNAF file.
  * @param expectedCount - The expected number of rows in the GNAF file.
  * @param context - The context containing the authority code tables.
- * @param options - Loading options.
- * @param options.refresh - Whether to refresh the index after each chunk.
+ * @param options - Loading options including refresh and progress callback.
  *
  * @returns {Promise<void>} - A promise that resolves when the GNAF address details are loaded into the index.
  */
@@ -554,10 +581,55 @@ const loadGNAFAddress = async (
     file: string,
     expectedCount: number,
     context: Types.MapPropertyContext,
-    { refresh = false } = {},
+    options: LoadGNAFAddressOptions = {},
 ): Promise<void> => {
+    const { refresh = false, onProgress, progressInterval = 250 } = options;
+
     // Initialize the actual count
     let actualCount = 0;
+
+    // Progress tracking state
+    const startTime = Date.now();
+    let lastProgressTime = 0;
+
+    /**
+     * Emits a progress update to the callback if provided.
+     *
+     * @param {boolean} force - Whether to force emit regardless of throttle.
+     */
+    const emitProgress = (force = false): void => {
+        if (!onProgress) return;
+
+        const now = Date.now();
+        if (!force && now - lastProgressTime < progressInterval) return;
+        lastProgressTime = now;
+
+        // Calculate elapsed time and speed
+        const elapsedMs = now - startTime;
+        const addressesPerSecond =
+            elapsedMs > 0 ? Math.round((actualCount / elapsedMs) * 1000) : 0;
+
+        // Calculate ETA
+        const remainingAddresses = expectedCount - actualCount;
+        const etaSeconds =
+            addressesPerSecond > 0
+                ? Math.round(remainingAddresses / addressesPerSecond)
+                : 0;
+
+        // Calculate percentage
+        const percentComplete =
+            expectedCount > 0
+                ? Math.min(100, (actualCount / expectedCount) * 100)
+                : 0;
+
+        onProgress({
+            processed: actualCount,
+            total: expectedCount,
+            addressesPerSecond,
+            etaSeconds,
+            percentComplete,
+        });
+    };
 
     // Determine chunk size: use dynamic sizing if enabled, otherwise use configured value
     const chunkSizeMB = DYNAMIC_RESOURCES_ENABLED
@@ -602,6 +674,9 @@ const loadGNAFAddress = async (
                         // Update the actual count with the number of processed rows
                         actualCount += processedCount;
 
+                        // Emit progress update
+                        emitProgress();
+
                         // Check for memory pressure before resuming
                         if (DYNAMIC_RESOURCES_ENABLED && isMemoryPressure()) {
                             logger(
@@ -628,6 +703,9 @@ const loadGNAFAddress = async (
             },
             // On complete, log the message and resolve
             complete: () => {
+                // Emit final progress
+                emitProgress(true);
+
                 if (VERBOSE)
                     logger(
                         "Address details loaded",
@@ -1202,6 +1280,7 @@ const initGNAFDataLoader = async (
 
             // Load and index the address details for this state
             const expectedCount = filesCounts[detailFile] || 0;
+            const indexingStartTime = Date.now();
             updateSpinner(
                 `${stateProgress} ${formatState(state)}: Indexing ${formatNumber(expectedCount)} addresses...`,
             );
@@ -1209,11 +1288,37 @@ const initGNAFDataLoader = async (
                 `${directory}/${detailFile}`,
                 filesCounts[detailFile],
                 loadContext as unknown as Types.MapPropertyContext,
-                { refresh },
+                {
+                    refresh,
+                    onProgress: (progress) => {
+                        // Build progress display with the terminalUI progress bar
+                        const progressBar = createProgressBar(
+                            progress.processed,
+                            progress.total,
+                            20,
+                        );
+
+                        // Format speed and ETA
+                        const speed = formatNumber(progress.addressesPerSecond);
+                        const processed = formatNumber(progress.processed);
+                        const total = formatNumber(progress.total);
+                        const eta =
+                            progress.etaSeconds > 0
+                                ? formatDuration(progress.etaSeconds * 1000)
+                                : "calculating...";
+
+                        // Update spinner text with detailed progress info
+                        updateSpinner(
+                            `${stateProgress} ${formatState(state)}: Indexing  ${progressBar}  ${theme.muted(`${processed} / ${total}`)}  ${theme.secondary(`${speed}/s`)}  ${theme.dim(`ETA: ${eta}`)}`,
+                        );
+                    },
+                },
             );
 
+            // Calculate total indexing duration for this state
+            const indexingDuration = Date.now() - indexingStartTime;
             succeedSpinner(
-                `${stateProgress} ${formatState(state)}: ${formatNumber(expectedCount)} addresses indexed`,
+                `${stateProgress} ${formatState(state)}: ${formatNumber(expectedCount)} addresses indexed in ${formatDuration(indexingDuration)}`,
             );
         }
     }
