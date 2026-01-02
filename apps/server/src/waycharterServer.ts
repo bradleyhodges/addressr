@@ -352,9 +352,44 @@ async function loadAddressCollection(params: AddressCollectionParams): Promise<{
  * @returns {Promise<string>} The base URL where the server is listening.
  * @throws {Error} When server creation or listener binding fails.
  */
+/**
+ * Middleware to transform JSON:API pagination parameters to WayCharter format.
+ * Converts `page[number]=2` to `page=1` (0-indexed for WayCharter).
+ *
+ * @param {Request} req - The incoming Express request.
+ * @param {Response} _res - The Express response (unused).
+ * @param {NextFunction} next - Invokes the next middleware.
+ */
+function transformPaginationParams(
+    req: Request,
+    _res: Response,
+    next: NextFunction,
+): void {
+    // Handle JSON:API style pagination: page[number]=2 -> page=1 (0-indexed)
+    // biome-ignore lint/suspicious/noExplicitAny: Express query params are untyped
+    const pageParam = req.query.page as any;
+    if (pageParam && typeof pageParam === "object" && pageParam.number) {
+        // Convert from 1-indexed JSON:API to 0-indexed WayCharter
+        const pageNumber = Number(pageParam.number);
+        if (Number.isFinite(pageNumber) && pageNumber > 0) {
+            req.query.page = String(pageNumber - 1);
+        }
+    } else if (typeof pageParam === "string") {
+        // If page is already a string number, convert from 1-indexed to 0-indexed
+        const pageNumber = Number(pageParam);
+        if (Number.isFinite(pageNumber) && pageNumber > 0) {
+            req.query.page = String(pageNumber - 1);
+        }
+    }
+    next();
+}
+
 export async function startRest2Server(): Promise<string> {
     // Use the CORS middleware
     app.use(appendCorsHeaders);
+
+    // Transform JSON:API pagination params before WayCharter processes them
+    app.use(transformPaginationParams);
 
     // Load and serve OpenAPI/Swagger documentation at /docs
     const swaggerSpecPath = path.join(__dirname, "../api/swagger.yaml");
