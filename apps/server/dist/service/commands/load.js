@@ -901,7 +901,8 @@ const initGNAFDataLoader = async (directory, { refresh = false } = {}) => {
         }
     }
     if (!(0, helpers_1.getDaemonMode)()) {
-        (0, helpers_1.logInfo)(`Processing ${statesToProcess.length} state(s): ${statesToProcess.map(helpers_1.formatState).join(", ")}`);
+        if (config_1.VERBOSE)
+            (0, helpers_1.logInfo)(`Processing ${statesToProcess.length} state(s): ${statesToProcess.map(helpers_1.formatState).join(", ")}`);
     }
     // Process each state's address detail file
     let stateIndex = 0;

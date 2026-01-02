@@ -76,7 +76,7 @@ export async function dropIndex(esClient: Client): Promise<void> {
         });
 
         // Log the result
-        logger({ deleteIndexResult });
+        if (VERBOSE) logger({ deleteIndexResult });
     }
 
     // Check if the index exists again
@@ -198,31 +198,31 @@ export async function initIndex(
             index: ES_INDEX_NAME,
             body: indexBody,
         });
-        logger({ indexCreateResult });
+        if (VERBOSE) logger({ indexCreateResult });
     } else {
         // When the index already exists, update settings and mappings then reopen.
         const indexCloseResult = await esClient.indices.close({
             index: ES_INDEX_NAME,
         });
-        logger({ indexCloseResult });
+        if (VERBOSE) logger({ indexCloseResult });
         const indexPutSettingsResult = await esClient.indices.putSettings({
             index: ES_INDEX_NAME,
             body: indexBody,
         });
-        logger({ indexPutSettingsResult });
+        if (VERBOSE) logger({ indexPutSettingsResult });
         const indexPutMappingResult = await esClient.indices.putMapping({
             index: ES_INDEX_NAME,
             body: indexBody.mappings,
         });
-        logger({ indexPutMappingResult });
+        if (VERBOSE) logger({ indexPutMappingResult });
         const indexOpenResult = await esClient.indices.open({
             index: ES_INDEX_NAME,
         });
-        logger({ indexOpenResult });
+        if (VERBOSE) logger({ indexOpenResult });
         const refreshResult = await esClient.indices.refresh({
             index: ES_INDEX_NAME,
         });
-        logger({ refreshResult });
+        if (VERBOSE) logger({ refreshResult });
     }
 
     // Get the index

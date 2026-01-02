@@ -90,8 +90,11 @@ const fileExists = async (filePath) => {
         return true;
     }
     catch (err) {
-        // If there is an error, log the error and return false
-        (0, index_1.error)(err);
+        // ENOENT (file not found) is expected when checking existence - don't log it
+        // Only log unexpected errors (permission issues, etc.)
+        if (err instanceof Error && "code" in err && err.code !== "ENOENT") {
+            (0, index_1.error)(err);
+        }
         return false;
     }
 };

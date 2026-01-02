@@ -1,17 +1,31 @@
 {
     "$schema": "https://turbo.build/schema.json",
     "ui": "tui",
-    "globalDependencies": [".babelrc"],
+    "globalDependencies": [".babelrc", "tsconfig.base.json"],
     "tasks": {
         "build": {
             "dependsOn": ["^build"],
-            "inputs": ["src/**/*"],
-            "outputs": ["lib/**"]
+            "inputs": [
+                "**/*.ts",
+                "**/*.tsx",
+                "!dist/**",
+                "!node_modules/**",
+                "tsconfig.json",
+                "package.json"
+            ],
+            "outputs": ["dist/**", "lib/**"]
         },
         "ci:build": {
             "dependsOn": ["build"],
-            "inputs": ["src/**/*"],
-            "outputs": ["lib/**"]
+            "inputs": [
+                "**/*.ts",
+                "**/*.tsx",
+                "!dist/**",
+                "!node_modules/**",
+                "tsconfig.json",
+                "package.json"
+            ],
+            "outputs": ["dist/**", "lib/**"]
         },
         "ci:version": {
             "dependsOn": ["build"]

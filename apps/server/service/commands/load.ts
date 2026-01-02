@@ -1190,9 +1190,10 @@ const initGNAFDataLoader = async (
     }
 
     if (!getDaemonMode()) {
-        logInfo(
-            `Processing ${statesToProcess.length} state(s): ${statesToProcess.map(formatState).join(", ")}`,
-        );
+        if (VERBOSE)
+            logInfo(
+                `Processing ${statesToProcess.length} state(s): ${statesToProcess.map(formatState).join(", ")}`,
+            );
     }
 
     // Process each state's address detail file

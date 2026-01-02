@@ -1,6 +1,6 @@
 {
     "name": "@bradleyhodges/addresskit",
-    "version": "2.1.5",
+    "version": "2.1.7",
     "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
     "config": {
         "localport": "6060",
@@ -20,7 +20,7 @@
     ],
     "scripts": {
         "typecheck": "turbo run typecheck",
-        "build": "pnpm format && pnpm run genversion && turbo run build --filter=@repo/addresskit-core --filter=@repo/addresskit-client --filter=@repo/addresskit-server",
+        "build": "pnpm format && pnpm run genversion && turbo run build",
         "dev": "turbo run dev --parallel --filter=!@bradleyhodges/addresskit",
         "smoke": "node tooling/smoke/smoke.mjs",
         "format": "biome check . --write --skip-errors",

@@ -52,7 +52,8 @@ async function dropIndex(esClient) {
             index: ES_INDEX_NAME,
         });
         // Log the result
-        logger({ deleteIndexResult });
+        if (exports.VERBOSE)
+            logger({ deleteIndexResult });
     }
     // Check if the index exists again
     const postExists = await esClient.indices.exists({ index: ES_INDEX_NAME });
@@ -152,32 +153,38 @@ async function initIndex(esClient, clear, synonyms) {
             index: ES_INDEX_NAME,
             body: indexBody,
         });
-        logger({ indexCreateResult });
+        if (exports.VERBOSE)
+            logger({ indexCreateResult });
     }
     else {
         // When the index already exists, update settings and mappings then reopen.
         const indexCloseResult = await esClient.indices.close({
             index: ES_INDEX_NAME,
         });
-        logger({ indexCloseResult });
+        if (exports.VERBOSE)
+            logger({ indexCloseResult });
         const indexPutSettingsResult = await esClient.indices.putSettings({
             index: ES_INDEX_NAME,
             body: indexBody,
         });
-        logger({ indexPutSettingsResult });
+        if (exports.VERBOSE)
+            logger({ indexPutSettingsResult });
         const indexPutMappingResult = await esClient.indices.putMapping({
             index: ES_INDEX_NAME,
             body: indexBody.mappings,
         });
-        logger({ indexPutMappingResult });
+        if (exports.VERBOSE)
+            logger({ indexPutMappingResult });
         const indexOpenResult = await esClient.indices.open({
             index: ES_INDEX_NAME,
         });
-        logger({ indexOpenResult });
+        if (exports.VERBOSE)
+            logger({ indexOpenResult });
         const refreshResult = await esClient.indices.refresh({
             index: ES_INDEX_NAME,
         });
-        logger({ refreshResult });
+        if (exports.VERBOSE)
+            logger({ refreshResult });
     }
     // Get the index
     const indexGetResult = await esClient.indices.get({
