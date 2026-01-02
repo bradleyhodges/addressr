@@ -5,7 +5,7 @@ import { version } from "@repo/addressr-core/version";
 import debug from "debug";
 import * as express from "express";
 import type { NextFunction, Request, Response } from "express";
-import { getAddress, searchForAddress } from "../service/address-service";
+import { getAddress, searchForAddress } from "../service";
 
 /**
  * The result of a get address request.

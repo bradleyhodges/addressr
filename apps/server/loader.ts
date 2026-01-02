@@ -1,6 +1,6 @@
 import { esConnect } from "@repo/addressr-client/elasticsearch";
 import debug from "debug";
-import { loadGnaf } from "./service/address-service";
+import service from "./service";
 import { printVersion } from "./service/printVersion";
 
 /**
@@ -38,7 +38,7 @@ async function runLoader(): Promise<void> {
     printVersion();
 
     // Load the G-NAF data
-    await loadGnaf();
+    await service.load();
     logger("data loaded");
 
     // Get the end time

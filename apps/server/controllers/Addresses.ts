@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import {
     getAddress as fetchAddress,
     getAddresses as fetchAddresses,
-} from "../service/address-service";
+} from "../service";
 
 type AddressResponse = {
     statusCode?: number;
