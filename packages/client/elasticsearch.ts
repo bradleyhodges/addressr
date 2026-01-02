@@ -289,9 +289,10 @@ export async function esConnect(
 
                         // Create a new client
                         const esClient = new Client(esClientOptions);
-                        logger(
-                            `connecting elastic search client on ${eshost}:${esport}...`,
-                        );
+                        if (VERBOSE)
+                            logger(
+                                `connecting elastic search client on ${eshost}:${esport}...`,
+                            );
 
                         // Ping the client
                         await esClient.ping();

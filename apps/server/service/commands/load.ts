@@ -206,23 +206,62 @@ const fetchGNAFArchive = async (): Promise<string> => {
             });
         });
 
-        // The destination file exists, so don't bother trying to download it again
+        // Verify the file size matches expected size
+        const existingStats = fs.statSync(destination);
+        if (dataResource.size && existingStats.size !== dataResource.size) {
+            // File exists but is incomplete or corrupted
+            if (VERBOSE)
+                logger(
+                    `Existing file size (${existingStats.size}) doesn't match expected (${dataResource.size}), re-downloading`,
+                );
+            // Delete the corrupted file and continue to download
+            fs.unlinkSync(destination);
+            throw new Error("File size mismatch");
+        }
+
+        // The destination file exists and has correct size, skip download
         return destination;
     } catch {
-        // The destination file does not exist, so we need to download it.
+        // The destination file does not exist or is invalid, so we need to download it.
         if (VERBOSE) logger("Starting G-NAF download");
 
+        // Check for incomplete download from previous attempt
+        const incompleteFile = `${incomplete_path}/${basename}`;
+        let existingBytes = 0;
+        try {
+            const incompleteStats = fs.statSync(incompleteFile);
+            existingBytes = incompleteStats.size;
+        } catch {
+            // No incomplete file exists
+        }
+
+        // Track whether we're resuming
+        let isResuming = false;
+
         // Start a spinner for the download
-        const downloadSpinner = startSpinner("Downloading G-NAF data file...");
+        const downloadSpinner =
+            existingBytes > 0
+                ? startSpinner(
+                      `Resuming G-NAF download from ${formatBytes(existingBytes)}...`,
+                  )
+                : startSpinner("Downloading G-NAF data file...");
         const downloadStartTime = Date.now();
 
         try {
-            // Download the GNAF file with progress callback
-            await download(
-                dataResource.url,
-                `${incomplete_path}/${basename}`,
-                dataResource.size,
-                (progress) => {
+            // Download the GNAF file with progress callback and resume support
+            await download({
+                url: dataResource.url,
+                destinationPath: incompleteFile,
+                expectedSize: dataResource.size,
+                enableResume: true,
+                onIncompleteDetected: (existing, expected) => {
+                    isResuming = true;
+                    if (VERBOSE)
+                        logger(
+                            `Found incomplete download: ${formatBytes(existing)} of ${formatBytes(expected)} (${((existing / expected) * 100).toFixed(1)}%)`,
+                        );
+                },
+                onProgress: (progress) => {
                     // Build progress display with the terminalUI progress bar
                     const progressBar = createProgressBar(
                         progress.bytesDownloaded,
@@ -239,21 +278,39 @@ const fetchGNAFArchive = async (): Promise<string> => {
                             ? formatDuration(progress.etaSeconds * 1000)
                             : "calculating...";
 
+                    // Show resume indicator if applicable
+                    const resumeIndicator = progress.isResuming
+                        ? theme.secondary(" (resumed)")
+                        : "";
+
                     // Update spinner text with beautiful progress info
                     updateSpinner(
-                        `Downloading G-NAF  ${progressBar}  ${theme.muted(`${downloaded} / ${total}`)}  ${theme.secondary(`${speed}/s`)}  ${theme.dim(`ETA: ${eta}`)}`,
+                        `Downloading G-NAF${resumeIndicator}  ${progressBar}  ${theme.muted(`${downloaded} / ${total}`)}  ${theme.secondary(`${speed}/s`)}  ${theme.dim(`ETA: ${eta}`)}`,
                     );
                 },
-            );
+            });
+
+            // Verify downloaded file size
+            const downloadedStats = fs.statSync(incompleteFile);
+            if (
+                dataResource.size &&
+                downloadedStats.size !== dataResource.size
+            ) {
+                // Downloaded file is incomplete or corrupted
+                throw new Error(
+                    `Downloaded file size (${downloadedStats.size}) doesn't match expected (${dataResource.size})`,
+                );
+            }
 
             // Calculate download duration
             const downloadDuration = Date.now() - downloadStartTime;
+            const resumeText = isResuming ? " (resumed)" : "";
             succeedSpinner(
-                `Downloaded G-NAF data file (${formatBytes(dataResource.size)} in ${formatDuration(downloadDuration)})`,
+                `Downloaded G-NAF data file${resumeText} (${formatBytes(dataResource.size)} in ${formatDuration(downloadDuration)})`,
             );
 
             // Rename the GNAF file
-            await fsp.rename(`${incomplete_path}/${basename}`, destination);
+            await fsp.rename(incompleteFile, destination);
             if (VERBOSE) logger("Finished downloading G-NAF", destination);
 
             // Return the destination path
@@ -262,8 +319,15 @@ const fetchGNAFArchive = async (): Promise<string> => {
             // Fail the spinner
             failSpinner("Failed to download G-NAF data file");
 
-            // Log the error
-            error("Error downloading G-NAF", error_);
+            // Log the error with helpful context
+            if (existingBytes > 0) {
+                error(
+                    `Error downloading G-NAF (partial file preserved at ${incompleteFile} for resume)`,
+                    error_,
+                );
+            } else {
+                error("Error downloading G-NAF", error_);
+            }
 
             // Throw the error
             throw error_;
