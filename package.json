@@ -13,6 +13,13 @@
         "localport": "6060",
         "SEARCH_IMAGE": "opensearchproject/opensearch:1.3.20"
     },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/bradleyhodges/addressr.git"
+    },
+    "bugs": {
+        "url": "https://github.com/bradleyhodges/addressr/issues"
+    },
     "scripts": {
         "typecheck": "turbo run typecheck",
         "dev": "turbo run dev --parallel --filter=!@bradleyhodges/addressr",
@@ -216,22 +223,10 @@
         "turbo": "^2.7.2",
         "typescript": "^5.9.3"
     },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/bradleyhodges/addressr.git"
-    },
-    "bugs": {
-        "url": "https://github.com/bradleyhodges/addressr/issues"
-    },
     "lint-staged": {
         "*.{js,jsx}": ["eslint --fix", "git add"],
         "*.{json,css,md}": ["prettier --write", "git add"],
         "*.{png,jpeg,jpg,gif,svg}": ["imagemin-lint-staged", "git add"],
         ".circleci/config.yml": ["circleci config validate", "git add"]
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "npm run pre-commit"
-        }
     }
 }
