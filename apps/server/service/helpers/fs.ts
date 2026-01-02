@@ -100,8 +100,11 @@ export const fileExists = async (filePath: string): Promise<boolean> => {
         // If there is no error, return true
         return true;
     } catch (err) {
-        // If there is an error, log the error and return false
-        error(err);
+        // ENOENT (file not found) is expected when checking existence - don't log it
+        // Only log unexpected errors (permission issues, etc.)
+        if (err instanceof Error && "code" in err && err.code !== "ENOENT") {
+            error(err);
+        }
         return false;
     }
 };
