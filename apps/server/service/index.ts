@@ -243,30 +243,44 @@ const searchForAddress = async (
                         // search against the `sla` and `ssla` fields
                         ...(normalizedSearch && {
                             should: [
+                                // Highest boost: Address starts with the search query (exact prefix match)
+                                // This ensures "50 ST GEORGES TCE" ranks above "UNIT 1, 50 ST GEORGES TCE"
                                 {
-                                    multi_match: {
-                                        fields: ["sla", "ssla"],
-                                        query: normalizedSearch,
-                                        // Fuzziness is set to AUTO to allow for typos and variations in the search string
-                                        fuzziness: "AUTO",
-                                        // Type is set to bool_prefix to allow for partial matching of the search string
-                                        type: "bool_prefix",
-                                        // Lenient is set to true to allow for partial matching of the search string
-                                        lenient: true,
-                                        // Auto generate synonyms phrase query is set to false to prevent the generation of synonyms phrase queries
-                                        auto_generate_synonyms_phrase_query: false,
-                                        operator: "AND",
+                                    prefix: {
+                                        "sla.raw": {
+                                            value: normalizedSearch.toUpperCase(),
+                                            boost: 100,
+                                        },
                                     },
                                 },
+                                // High boost: Short single-line address starts with search query
+                                {
+                                    prefix: {
+                                        "ssla.raw": {
+                                            value: normalizedSearch.toUpperCase(),
+                                            boost: 80,
+                                        },
+                                    },
+                                },
+                                // Medium boost: Phrase prefix match (sequential term matching)
+                                {
+                                    multi_match: {
+                                        fields: ["sla^2", "ssla"],
+                                        query: normalizedSearch,
+                                        type: "phrase_prefix",
+                                        lenient: true,
+                                        auto_generate_synonyms_phrase_query: false,
+                                        boost: 10,
+                                    },
+                                },
+                                // Lower boost: Fuzzy bool_prefix for typo tolerance
                                 {
                                     multi_match: {
                                         fields: ["sla", "ssla"],
                                         query: normalizedSearch,
-                                        // Type is set to phrase_prefix to allow for partial matching of the search string
-                                        type: "phrase_prefix",
-                                        // Lenient is set to true to allow for partial matching of the search string
+                                        fuzziness: "AUTO",
+                                        type: "bool_prefix",
                                         lenient: true,
-                                        // Auto generate synonyms phrase query is set to false to prevent the generation of synonyms phrase queries
                                         auto_generate_synonyms_phrase_query: false,
                                         operator: "AND",
                                     },
