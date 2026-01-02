@@ -294,51 +294,62 @@ const getAddress = async (addressId) => {
             (0, exports.logger)("jsonX", jsonX);
         // Extract the source data from OpenSearch response
         const source = jsonX.body._source;
+        // Handle the nested data structure from OpenSearch
+        // Some fields are in source.structured.structured (double nesting from indexing)
+        // Some fields are directly in source.structured
+        // Some fields are at the root level of source
+        const struct = source.structured ?? {};
+        const innerStruct = struct.structured ?? {};
         // Build the JSON:API address detail attributes
         const attributes = {
             pid: addressId,
             sla: source.sla,
             ...(source.ssla !== undefined && { ssla: source.ssla }),
-            ...(source.structured?.mla !== undefined && {
-                mla: source.structured.mla,
+            // mla can be at root level or in structured
+            ...((source.mla ?? struct.mla) !== undefined && {
+                mla: source.mla ?? struct.mla,
             }),
-            ...(source.structured?.smla !== undefined && {
-                smla: source.structured.smla,
+            ...((source.smla ?? struct.smla) !== undefined && {
+                smla: source.smla ?? struct.smla,
             }),
             structured: {
-                ...(source.structured?.buildingName !== undefined && {
-                    buildingName: source.structured.buildingName,
+                // Check both inner structured and outer structured for each field
+                ...((innerStruct.buildingName ?? struct.buildingName) !==
+                    undefined && {
+                    buildingName: innerStruct.buildingName ?? struct.buildingName,
                 }),
-                ...(source.structured?.lotNumber !== undefined && {
-                    lotNumber: source.structured.lotNumber,
+                ...((innerStruct.lotNumber ?? struct.lotNumber) !==
+                    undefined && {
+                    lotNumber: innerStruct.lotNumber ?? struct.lotNumber,
                 }),
-                ...(source.structured?.flat !== undefined && {
-                    flat: source.structured.flat,
+                ...((innerStruct.flat ?? struct.flat) !== undefined && {
+                    flat: innerStruct.flat ?? struct.flat,
                 }),
-                ...(source.structured?.level !== undefined && {
-                    level: source.structured.level,
+                ...((innerStruct.level ?? struct.level) !== undefined && {
+                    level: innerStruct.level ?? struct.level,
                 }),
-                ...(source.structured?.number !== undefined && {
-                    number: source.structured.number,
+                ...((innerStruct.number ?? struct.number) !== undefined && {
+                    number: innerStruct.number ?? struct.number,
                 }),
-                ...(source.structured?.street !== undefined && {
-                    street: source.structured.street,
+                ...((innerStruct.street ?? struct.street) !== undefined && {
+                    street: innerStruct.street ?? struct.street,
                 }),
-                ...(source.structured?.locality !== undefined && {
-                    locality: source.structured.locality,
+                ...((innerStruct.locality ?? struct.locality) !== undefined && {
+                    locality: innerStruct.locality ?? struct.locality,
                 }),
-                ...(source.structured?.state !== undefined && {
-                    state: source.structured.state,
+                ...((innerStruct.state ?? struct.state) !== undefined && {
+                    state: innerStruct.state ?? struct.state,
                 }),
-                ...(source.structured?.postcode !== undefined && {
-                    postcode: source.structured.postcode,
+                ...((innerStruct.postcode ?? struct.postcode) !== undefined && {
+                    postcode: innerStruct.postcode ?? struct.postcode,
                 }),
-                ...(source.structured?.confidence !== undefined && {
-                    confidence: source.structured.confidence,
+                ...((innerStruct.confidence ?? struct.confidence) !==
+                    undefined && {
+                    confidence: innerStruct.confidence ?? struct.confidence,
                 }),
             },
-            ...(source.structured?.geo !== undefined && {
-                geo: source.structured.geo,
+            ...((innerStruct.geo ?? struct.geo) !== undefined && {
+                geo: innerStruct.geo ?? struct.geo,
             }),
         };
         // Build the JSON:API resource and document

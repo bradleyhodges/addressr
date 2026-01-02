@@ -1,1 +1,1 @@
-{"version":3,"file":"waycharterServer.d.ts","sourceRoot":"","sources":["../../src/waycharterServer.ts"],"names":[],"mappings":"AA8QA;;;;;GAKG;AACH,wBAAsB,gBAAgB,IAAI,OAAO,CAAC,MAAM,CAAC,CA6GxD;AAED;;;;GAIG;AACH,wBAAgB,UAAU,IAAI,IAAI,CAIjC"}
+{"version":3,"file":"waycharterServer.d.ts","sourceRoot":"","sources":["../../src/waycharterServer.ts"],"names":[],"mappings":"AAkYA,wBAAsB,gBAAgB,IAAI,OAAO,CAAC,MAAM,CAAC,CAgHxD;AAED;;;;GAIG;AACH,wBAAgB,UAAU,IAAI,IAAI,CAIjC"}

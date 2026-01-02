@@ -50,24 +50,27 @@ function appendCorsHeaders(_request, response, next) {
     next();
 }
 /**
- * Maps a raw search hit into the API's public address structure.
+ * Maps a raw search hit into a JSON:API autocomplete resource.
  *
  * @param {AddressSearchHit} hit - Search hit returned by the backing index.
- * @returns {AddressCollectionBody} Normalized address payload for clients.
+ * @param {number} maxScore - The maximum score for normalization.
+ * @returns {AddressSuggestionResource} JSON:API resource for autocomplete.
  */
-function mapSearchHitToAddress(hit) {
-    // Use the first highlight snippet for each field if available, otherwise fall back to source
-    const highlightSla = hit.highlight?.sla?.[0] ?? hit._source.sla;
-    const highlightSsla = hit.highlight?.ssla?.[0] ?? hit._source.ssla;
+function mapSearchHitToResource(hit, maxScore) {
+    const addressId = hit._id.replace("/addresses/", "");
+    // Normalize score to 0-1 range relative to the best match
+    const normalizedRank = maxScore > 0 ? hit._score / maxScore : 0;
     return {
-        sla: hit._source.sla,
-        ...(hit._source.ssla && { ssla: hit._source.ssla }),
-        highlight: {
-            sla: highlightSla,
-            ...(highlightSsla && { ssla: highlightSsla }),
+        type: "address-suggestion",
+        id: addressId,
+        attributes: {
+            sla: hit._source.sla,
+            ...(hit._source.ssla && { ssla: hit._source.ssla }),
+            rank: Math.round(normalizedRank * 100) / 100,
         },
-        score: hit._score,
-        pid: hit._id.replace("/addresses/", ""),
+        links: {
+            self: `/addresses/${addressId}`,
+        },
     };
 }
 /**
@@ -96,9 +99,10 @@ async function loadAddressItem({ pid }) {
 }
 /**
  * Retrieves a paginated collection of addresses matching the supplied query.
+ * Returns a JSON:API formatted document.
  *
  * @param {AddressCollectionParams} params - Pagination and query parameters from WayCharter.
- * @returns {Promise<{ body: AddressCollectionBody[]; hasMore: boolean; headers: Record<string, string>; }>} Collection response with cache headers.
+ * @returns {Promise<{ body: AddressAutocompleteDocument; hasMore: boolean; headers: Record<string, string>; }>} JSON:API collection response.
  * @throws {Error} When the provided page value cannot be parsed as a number.
  */
 async function loadAddressCollection(params) {
@@ -108,25 +112,58 @@ async function loadAddressCollection(params) {
     if (!Number.isFinite(resolvedPage)) {
         throw new Error("Search page value must be numeric.");
     }
+    // Build base URL for pagination links
+    const baseUrl = `/addresses${q ? `?q=${encodeURIComponent(q)}` : ""}`;
     // If the query is defined and longer than 2 characters, search for addresses.
     if (q && q.length > 2) {
         logger("Searching for addresses with query:", q);
         // Query length guard prevents expensive searches on very short strings.
         const searchResult = (await (0, service_1.searchForAddress)(q, resolvedPage + 1, pageSize));
-        logger("Search result totalHits:", searchResult.totalHits);
-        logger("Search response structure:", JSON.stringify(Object.keys(searchResult)));
         // Extract hits from the nested searchResponse structure
         const hits = searchResult.searchResponse.body.hits.hits;
-        // Map the search hits to the address collection body.
-        const body = hits.map(mapSearchHitToAddress);
+        const totalHits = searchResult.totalHits;
+        const totalPages = Math.ceil(totalHits / pageSize);
+        const currentPage = resolvedPage + 1;
+        // Get max score for normalization (first hit typically has highest score)
+        const maxScore = hits.length > 0 ? hits[0]._score : 1;
+        // Map the search hits to JSON:API resources
+        const data = hits.map((hit) => mapSearchHitToResource(hit, maxScore));
+        // Build JSON:API document
+        const jsonApiDocument = {
+            jsonapi: { version: "1.1" },
+            data,
+            links: {
+                self: `${baseUrl}${currentPage > 1 ? `&page[number]=${currentPage}` : ""}`,
+                first: baseUrl,
+                ...(currentPage > 1 && {
+                    prev: currentPage === 2
+                        ? baseUrl
+                        : `${baseUrl}&page[number]=${currentPage - 1}`,
+                }),
+                ...(currentPage < totalPages && {
+                    next: `${baseUrl}&page[number]=${currentPage + 1}`,
+                }),
+                ...(totalPages > 0 && {
+                    last: totalPages === 1
+                        ? baseUrl
+                        : `${baseUrl}&page[number]=${totalPages}`,
+                }),
+            },
+            meta: {
+                total: totalHits,
+                page: currentPage,
+                pageSize,
+                totalPages,
+            },
+        };
         // Create a hash of the body to use as the ETag.
         const responseHash = (0, node_crypto_1.createHash)("md5")
-            .update(JSON.stringify(body))
+            .update(JSON.stringify(jsonApiDocument))
             .digest("hex");
-        // Return the address collection body, hasMore, and headers.
+        // Return the JSON:API document, hasMore, and headers.
         return {
-            body,
-            hasMore: resolvedPage < searchResult.totalHits / pageSize - 1,
+            body: jsonApiDocument,
+            hasMore: currentPage < totalPages,
             headers: {
                 etag: `"${version_1.version}-${responseHash}"`,
                 "cache-control": `public, max-age=${ONE_WEEK}`,
@@ -134,8 +171,21 @@ async function loadAddressCollection(params) {
         };
     }
     // Empty query responses still carry cache headers for intermediary caches.
+    const emptyDocument = {
+        jsonapi: { version: "1.1" },
+        data: [],
+        links: {
+            self: baseUrl,
+        },
+        meta: {
+            total: 0,
+            page: 1,
+            pageSize,
+            totalPages: 0,
+        },
+    };
     return {
-        body: [],
+        body: emptyDocument,
         hasMore: false,
         headers: {
             etag: `"${version_1.version}"`,
@@ -149,9 +199,39 @@ async function loadAddressCollection(params) {
  * @returns {Promise<string>} The base URL where the server is listening.
  * @throws {Error} When server creation or listener binding fails.
  */
+/**
+ * Middleware to transform JSON:API pagination parameters to WayCharter format.
+ * Converts `page[number]=2` to `page=1` (0-indexed for WayCharter).
+ *
+ * @param {Request} req - The incoming Express request.
+ * @param {Response} _res - The Express response (unused).
+ * @param {NextFunction} next - Invokes the next middleware.
+ */
+function transformPaginationParams(req, _res, next) {
+    // Handle JSON:API style pagination: page[number]=2 -> page=1 (0-indexed)
+    // biome-ignore lint/suspicious/noExplicitAny: Express query params are untyped
+    const pageParam = req.query.page;
+    if (pageParam && typeof pageParam === "object" && pageParam.number) {
+        // Convert from 1-indexed JSON:API to 0-indexed WayCharter
+        const pageNumber = Number(pageParam.number);
+        if (Number.isFinite(pageNumber) && pageNumber > 0) {
+            req.query.page = String(pageNumber - 1);
+        }
+    }
+    else if (typeof pageParam === "string") {
+        // If page is already a string number, convert from 1-indexed to 0-indexed
+        const pageNumber = Number(pageParam);
+        if (Number.isFinite(pageNumber) && pageNumber > 0) {
+            req.query.page = String(pageNumber - 1);
+        }
+    }
+    next();
+}
 async function startRest2Server() {
     // Use the CORS middleware
     app.use(appendCorsHeaders);
+    // Transform JSON:API pagination params before WayCharter processes them
+    app.use(transformPaginationParams);
     // Load and serve OpenAPI/Swagger documentation at /docs
     const swaggerSpecPath = path.join(__dirname, "../api/swagger.yaml");
     const swaggerSpec = (0, js_yaml_1.load)((0, node_fs_1.readFileSync)(swaggerSpecPath, "utf8"));

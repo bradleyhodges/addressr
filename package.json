@@ -1,6 +1,6 @@
 {
     "name": "@bradleyhodges/addresskit",
-    "version": "2.2.1",
+    "version": "2.2.2",
     "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
     "config": {
         "localport": "6060",
