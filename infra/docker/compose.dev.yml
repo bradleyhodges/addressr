@@ -1,4 +1,7 @@
 services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # OpenSearch - Search and indexing backend
+  # ─────────────────────────────────────────────────────────────────────────────
   opensearch:
     image: opensearchproject/opensearch:1.3.2
     environment:
@@ -6,9 +9,6 @@ services:
       - plugins.security.disabled=true
       # Dev heap sizing; tune up/down depending on your box.
       - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
-      # Avoids OpenSearch complaining about running as single node with certain defaults
-      - cluster.name=addresskit-dev
-      - node.name=opensearch-1
     ports:
       - "9200:9200"
       - "9300:9300"
@@ -27,6 +27,99 @@ services:
       timeout: 3s
       retries: 40
     restart: unless-stopped
+    networks:
+      - addresskit
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AddressKit Loader - Loads G-NAF data into OpenSearch
+  # ─────────────────────────────────────────────────────────────────────────────
+  loader:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      args:
+        PACKAGE: "@bradleyhodges/addresskit"
+        VERSION: "${VERSION:-latest}"
+        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.2.4}.tgz"
+    environment:
+      # OpenSearch connection
+      - ELASTIC_HOST=opensearch
+      - ELASTIC_PORT=9200
+      - ELASTIC_PROTOCOL=http
+      # Index configuration
+      - ES_INDEX_NAME=addresskit
+      - ES_CLEAR_INDEX=${ES_CLEAR_INDEX:-false}
+      # Loading options (comma-separated states, e.g., NSW,VIC,QLD)
+      - COVERED_STATES=${COVERED_STATES:-}
+      # Enable geocoding (increases index size significantly)
+      - ADDRESSKIT_ENABLE_GEO=${ADDRESSKIT_ENABLE_GEO:-}
+      # Verbose logging for debugging
+      - VERBOSE=${VERBOSE:-false}
+      - DEBUG=api,error
+      # Resource management
+      - ADDRESSKIT_DYNAMIC_RESOURCES=true
+      - ADDRESSKIT_TARGET_MEMORY_UTILIZATION=0.7
+    volumes:
+      # Persist G-NAF downloads between runs to avoid re-downloading
+      - gnaf-data:/home/node/gnaf
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    command: ["addresskit", "load"]
+    restart: "no"
+    networks:
+      - addresskit
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AddressKit API - REST API server for address search/autocomplete
+  # ─────────────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      args:
+        PACKAGE: "@bradleyhodges/addresskit"
+        VERSION: "${VERSION:-latest}"
+        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.2.4}.tgz"
+    environment:
+      # OpenSearch connection
+      - ELASTIC_HOST=opensearch
+      - ELASTIC_PORT=9200
+      - ELASTIC_PROTOCOL=http
+      # Server configuration
+      - PORT=8080
+      - NODE_ENV=development
+      # Index configuration
+      - ES_INDEX_NAME=addresskit
+      # CORS settings (allow all origins in dev)
+      - ADDRESSKIT_ACCESS_CONTROL_ALLOW_ORIGIN=*
+      # Caching configuration
+      - ADDRESSKIT_CACHE_ENABLED=true
+      - ADDRESSKIT_CACHE_MAX_ENTRIES=1000
+      - ADDRESSKIT_CACHE_TTL_MS=300000
+      # Verbose logging for debugging
+      - VERBOSE=${VERBOSE:-false}
+      - DEBUG=api,error
+    ports:
+      - "8080:8080"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    command: ["addresskit", "start", "--daemon", "--port", "8080"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/addresses?q=test >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - addresskit
 
 volumes:
   opensearch-data:
+  gnaf-data:
+
+networks:
+  addresskit:
+    driver: bridge

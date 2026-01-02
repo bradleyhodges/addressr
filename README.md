@@ -50,6 +50,7 @@ AddressKit is a comprehensive solution for managing and validating Australian ad
   - [Version Command](#version-command)
 - [Quick Start](#quick-start)
   - [Self Hosted](#self-hosted)
+  - [Docker Compose](#docker-compose)
 - [API Endpoints](#api-endpoints)
   - [Search / Autocomplete](#search--autocomplete)
   - [Get Address Details](#get-address-details)
@@ -321,6 +322,112 @@ An updated G-NAF is released every 3 months. Set up a cron job to keep AddressKi
 
 **Windows (Task Scheduler):**
 Create a scheduled task to run `addresskit load --clear` monthly.
+
+## Docker Compose
+
+The fastest way to get AddressKit running. No installation required - just good ol' Docker.
+
+### 1. Create `docker-compose.yml`
+
+Copy this into a new file called `docker-compose.yml`:
+
+```yaml
+services:
+  opensearch:
+    image: opensearchproject/opensearch:1.3.2
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  api:
+    image: bradleyhodges/addresskit:latest
+    environment:
+      - ELASTIC_HOST=opensearch
+      - ELASTIC_PORT=9200
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    command: ["addresskit", "start", "--daemon"]
+    restart: unless-stopped
+
+  loader:
+    image: bradleyhodges/addresskit:latest
+    environment:
+      - ELASTIC_HOST=opensearch
+      - ELASTIC_PORT=9200
+      # Uncomment to load specific states only (faster)
+      # - COVERED_STATES=NSW,VIC
+      # Uncomment to enable geocoding (requires more memory)
+      # - ADDRESSKIT_ENABLE_GEO=1
+    volumes:
+      - gnaf-data:/home/node/gnaf
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    command: ["addresskit", "load"]
+    restart: "no"
+
+volumes:
+  opensearch-data:
+  gnaf-data:
+```
+
+### 2. Start OpenSearch and API
+
+```bash
+docker compose up -d opensearch api
+```
+
+### 3. Load Address Data
+
+```bash
+# Load all Australian addresses (takes ~20-40 minutes)
+docker compose run --rm loader
+```
+
+> **Tip:** To load only specific states (faster), edit the `COVERED_STATES` environment variable in the compose file before running.
+
+### 4. Test the API
+
+```bash
+curl "http://localhost:8080/addresses?q=300+barangaroo"
+```
+
+### 5. View Logs
+
+```bash
+docker compose logs -f api
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `COVERED_STATES` | Comma-separated states to load (e.g., `NSW,VIC`) | All states |
+| `ADDRESSKIT_ENABLE_GEO` | Enable geocoding (`1` to enable) | Disabled |
+| `ES_CLEAR_INDEX` | Clear index before loading (`true`) | `false` |
+
+### Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `opensearch` | Search backend | 9200 |
+| `api` | REST API server | 8080 |
+| `loader` | G-NAF data loader (run once) | - |
 
 # API Endpoints
 
