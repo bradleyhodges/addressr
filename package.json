@@ -127,11 +127,17 @@
         "ci:publish": "[ \"$CI\" = true ] && changeset publish || echo \"Dry run: changeset publish\""
     },
     "bin": {
+        "addresskit": "apps/server/dist/cli/index.js",
         "addresskit-loader": "lib/bin/addresskit-loader.js",
         "addresskit-server": "lib/bin/addresskit-server.js",
         "addresskit-server-2": "lib/bin/addresskit-server-2.js"
     },
-    "files": ["tooling/scripts/check-version.js"],
+    "files": [
+        "tooling/scripts/check-version.js",
+        "apps/server/dist/**/*",
+        "packages/core/dist/**/*",
+        "packages/client/dist/**/*"
+    ],
     "keywords": [
         "swagger",
         "g-naf",

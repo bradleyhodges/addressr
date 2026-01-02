@@ -16,30 +16,40 @@ const ProgressBar = require("progress");
  * @returns {Promise<https.IncomingMessage>} Resolves with the response once the file is fully written.
  */
 function streamDown(url, destinationPath, expectedSize) {
+    // Parse the URL into a URI object
     const uri = (0, node_url_1.parse)(url);
+    // Resolve the destination path to a file name
     const resolvedDestination = destinationPath ?? path.basename(uri.path ?? url);
+    // Create a write stream to the resolved destination
     const file = fs.createWriteStream(resolvedDestination);
     return new Promise((resolve, reject) => {
+        // Get the response from the URL
         (0, node_https_1.get)(uri.href, (response) => {
+            // Get the content length header
             const contentLengthHeader = response.headers["content-length"];
+            // Calculate the total bytes to download
             const totalBytes = contentLengthHeader !== undefined
                 ? Number.parseInt(contentLengthHeader, 10)
                 : (expectedSize ?? 0);
+            // Create a progress bar
             const progressBar = new ProgressBar("  downloading [:bar] :rate/bps :percent :etas", {
                 complete: "=",
                 incomplete: " ",
                 width: 20,
                 total: totalBytes,
             });
+            // Write the data to the file
             response.on("data", (chunk) => {
                 file.write(chunk);
                 progressBar.tick(chunk.length);
             });
+            // End the file
             response.on("end", () => {
                 file.end();
                 console.log(`\n${uri.path} downloaded to: ${resolvedDestination}`);
                 resolve(response);
             });
+            // Handle errors
             response.on("error", (error) => {
                 reject(error);
             });

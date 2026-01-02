@@ -17,16 +17,6 @@ const errorLogger = (0, debug_1.default)("error:default");
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param res - Express response.
- *
- * @example
- * GET /
- *
- * Response Headers:
- * Link: </addresses>; rel="addresses", </docs/>; rel="describedby"
- * Link-Template: </addresses{?q,p}>; rel="addresses"
- *
- * Response Body:
- * {}
  */
 function getApiRoot(request, res) {
     // Fetch the API root link relations from the service

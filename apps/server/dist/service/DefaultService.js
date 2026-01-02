@@ -28,11 +28,6 @@ const isSwaggerDocAvailable = () => {
  *
  * @returns A promise resolving to the API root response with HATEOAS links.
  * @throws {Error} If the Swagger document is not available.
- *
- * @example
- * Response Headers:
- * Link: </addresses>; rel="addresses"; title="Get addresses"
- * Link-Template: </addresses{?q,p}>; rel="addresses"; title="Get addresses"
  */
 async function getApiRoot() {
     // Verify Swagger document is loaded before proceeding
@@ -43,13 +38,14 @@ async function getApiRoot() {
     // Get paths that have GET operations with x-root-rel defined
     const paths = Object.keys(global.swaggerDoc.paths).filter((p) => {
         const pathDef = global.swaggerDoc.paths[p];
-        return pathDef.get !== undefined && pathDef.get["x-root-rel"] !== undefined;
+        return (pathDef.get !== undefined && pathDef.get["x-root-rel"] !== undefined);
     });
     // Create a new link header for resource links
     const link = new LinkHeader();
     // Loop through the paths and add links for those without required parameters
     for (const p of paths) {
-        const op = global.swaggerDoc.paths[p].get;
+        const op = global.swaggerDoc.paths[p]
+            .get;
         // Skip operations that have required parameters (they need templates instead)
         const hasRequiredParams = op.parameters?.some((parameter) => parameter.required === true);
         if (!hasRequiredParams) {
@@ -80,7 +76,8 @@ async function getApiRoot() {
     const linkTemplate = new LinkHeader();
     // Loop through the paths and add templated links for each operation
     for (const url of paths) {
-        const op = global.swaggerDoc.paths[url].get;
+        const op = global.swaggerDoc.paths[url]
+            .get;
         // Log the operation for debugging
         logger("Adding link template for:", op.operationId);
         // Set the link options (adds templated URI with query parameters)

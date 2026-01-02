@@ -162,4 +162,68 @@ export declare const CORS_EXPOSE_HEADERS: string | undefined;
  * @env ADDRESSKIT_ACCESS_CONTROL_ALLOW_HEADERS
  */
 export declare const CORS_ALLOW_HEADERS: string | undefined;
+/**
+ * Maximum number of entries in the search result cache.
+ * Higher values improve hit rate but consume more memory.
+ *
+ * @default 1000
+ * @env ADDRESSKIT_CACHE_MAX_ENTRIES
+ */
+export declare const CACHE_MAX_ENTRIES: number;
+/**
+ * TTL (Time-To-Live) for search cache entries in milliseconds.
+ * Balance freshness with performance based on your data update frequency.
+ *
+ * @default 300000 (5 minutes)
+ * @env ADDRESSKIT_CACHE_TTL_MS
+ */
+export declare const CACHE_TTL_MS: number;
+/**
+ * Whether to enable search result caching.
+ * Disable for development or when debugging cache issues.
+ *
+ * @default true
+ * @env ADDRESSKIT_CACHE_ENABLED
+ */
+export declare const CACHE_ENABLED: boolean;
+/**
+ * Number of consecutive failures before the circuit opens.
+ * Lower values provide faster failure detection but may trigger on transient issues.
+ *
+ * @default 5
+ * @env ADDRESSKIT_CIRCUIT_FAILURE_THRESHOLD
+ */
+export declare const CIRCUIT_FAILURE_THRESHOLD: number;
+/**
+ * Time in milliseconds before the circuit attempts to close after opening.
+ * Gives the downstream service time to recover.
+ *
+ * @default 30000 (30 seconds)
+ * @env ADDRESSKIT_CIRCUIT_RESET_TIMEOUT_MS
+ */
+export declare const CIRCUIT_RESET_TIMEOUT_MS: number;
+/**
+ * Number of successful requests required to close the circuit from half-open.
+ * Ensures service is reliably recovered before resuming normal traffic.
+ *
+ * @default 3
+ * @env ADDRESSKIT_CIRCUIT_SUCCESS_THRESHOLD
+ */
+export declare const CIRCUIT_SUCCESS_THRESHOLD: number;
+/**
+ * Whether to enable dynamic resource-aware configuration.
+ * When enabled, chunk sizes are calculated based on available system memory.
+ *
+ * @default true
+ * @env ADDRESSKIT_DYNAMIC_RESOURCES
+ */
+export declare const DYNAMIC_RESOURCES_ENABLED: boolean;
+/**
+ * Target memory utilization for resource calculations (0-1).
+ * Lower values leave more headroom for other processes.
+ *
+ * @default 0.7 (70%)
+ * @env ADDRESSKIT_TARGET_MEMORY_UTILIZATION
+ */
+export declare const TARGET_MEMORY_UTILIZATION: number;
 //# sourceMappingURL=config.d.ts.map

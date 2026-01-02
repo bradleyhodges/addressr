@@ -1,3 +1,4 @@
+"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ELASTIC_PORT = void 0;
 exports.dropIndex = dropIndex;
@@ -61,7 +62,8 @@ async function dropIndex(esClient) {
  */
 async function initIndex(esClient, clear, synonyms) {
     // If the clear flag is set, drop the index
-    if (clear) await dropIndex(esClient);
+    if (clear)
+        await dropIndex(esClient);
     // Check if the index exists
     const exists = await esClient.indices.exists({ index: ES_INDEX_NAME });
     logger("index exists:", exists.body);
@@ -141,7 +143,8 @@ async function initIndex(esClient, clear, synonyms) {
             body: indexBody,
         });
         logger({ indexCreateResult });
-    } else {
+    }
+    else {
         // When the index already exists, update settings and mappings then reopen.
         const indexCloseResult = await esClient.indices.close({
             index: ES_INDEX_NAME,
@@ -184,12 +187,7 @@ async function initIndex(esClient, clear, synonyms) {
  * @returns {Promise<Client>} Resolved OpenSearch client bound to `global.esClient`.
  * @throws {Error} When connection attempts continually fail (propagates last error).
  */
-async function esConnect(
-    esport = exports.ELASTIC_PORT,
-    eshost = ELASTIC_HOST,
-    interval = 1000,
-    timeout = 0,
-) {
+async function esConnect(esport = exports.ELASTIC_PORT, eshost = ELASTIC_HOST, interval = 1000, timeout = 0) {
     // Keep trying until the host:port is reachable.
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -219,24 +217,18 @@ async function esConnect(
                             node,
                         };
                         // Create a new client
-                        const esClient = new opensearch_1.Client(
-                            esClientOptions,
-                        );
-                        logger(
-                            `connecting elastic search client on ${eshost}:${esport}...`,
-                        );
+                        const esClient = new opensearch_1.Client(esClientOptions);
+                        logger(`connecting elastic search client on ${eshost}:${esport}...`);
                         // Ping the client
                         await esClient.ping();
                         logger(`...connected to ${eshost}:${esport}`);
                         // Set the client in the global scope
                         global.esClient = esClient;
                         return esClient;
-                    } catch (error_) {
+                    }
+                    catch (error_) {
                         // Log the error
-                        error(
-                            `An error occurred while trying to connect the elastic search client on ${eshost}:${esport}`,
-                            error_,
-                        );
+                        error(`An error occurred while trying to connect the elastic search client on ${eshost}:${esport}`, error_);
                         // Wait for the interval
                         await new Promise((resolve) => {
                             setTimeout(() => resolve(undefined), interval);
@@ -246,12 +238,10 @@ async function esConnect(
                     }
                 }
             }
-        } catch (error_) {
+        }
+        catch (error_) {
             // Log the error
-            error(
-                `An error occured while waiting to reach elastic search on ${eshost}:${esport}`,
-                error_,
-            );
+            error(`An error occured while waiting to reach elastic search on ${eshost}:${esport}`, error_);
             await new Promise((resolve) => {
                 setTimeout(() => resolve(undefined), interval);
             });

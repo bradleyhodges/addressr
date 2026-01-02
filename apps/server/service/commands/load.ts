@@ -30,10 +30,22 @@ import {
     ResourceMonitor,
     buildSynonyms,
     clearAuthorityCodeMaps,
+    createProgressBar,
+    failSpinner,
+    formatBytes,
+    formatNumber,
+    formatState,
+    getDaemonMode,
     getOptimalChunkSize,
     isMemoryPressure,
+    logInfo,
+    logWarning,
     mapAddressDetails,
+    startSpinner,
+    succeedSpinner,
+    updateSpinner,
     waitForMemory,
+    warnSpinner,
 } from "../helpers";
 import {
     countLinesInFile,
@@ -975,7 +987,25 @@ const initGNAFDataLoader = async (
     );
     logger("addressDetailFiles", addressDetailFiles);
 
+    // Determine which states to process
+    const statesToProcess: string[] = [];
+    for (const detailFile of addressDetailFiles) {
+        const state = path
+            .basename(detailFile, path.extname(detailFile))
+            .replace(/_.*/, "");
+        if (COVERED_STATES.length === 0 || COVERED_STATES.includes(state)) {
+            statesToProcess.push(state);
+        }
+    }
+
+    if (!getDaemonMode()) {
+        logInfo(
+            `Processing ${statesToProcess.length} state(s): ${statesToProcess.map(formatState).join(", ")}`,
+        );
+    }
+
     // Process each state's address detail file
+    let stateIndex = 0;
     for (const detailFile of addressDetailFiles) {
         // Extract state abbreviation from filename (e.g., "NSW_ADDRESS_DETAIL_psv.psv" -> "NSW")
         const state = path
@@ -984,6 +1014,14 @@ const initGNAFDataLoader = async (
 
         // Check if this state should be processed (based on COVERED_STATES environment variable)
         if (COVERED_STATES.length === 0 || COVERED_STATES.includes(state)) {
+            stateIndex++;
+            const stateProgress = `[${stateIndex}/${statesToProcess.length}]`;
+
+            // Start state processing spinner
+            const stateSpinner = startSpinner(
+                `${stateProgress} Processing ${formatState(state)}...`,
+            );
+
             // Set the current state in the load context
             loadContext.state = state;
             loadContext.stateName = await loadStateData(
@@ -993,6 +1031,9 @@ const initGNAFDataLoader = async (
             );
 
             // Load street locality data and index by STREET_LOCALITY_PID
+            updateSpinner(
+                `${stateProgress} ${formatState(state)}: Loading streets...`,
+            );
             logger("Loading streets", state);
             const streetLocality = await loadStreetLocality(
                 files,
@@ -1005,6 +1046,9 @@ const initGNAFDataLoader = async (
             }
 
             // Load locality (suburb) data and index by LOCALITY_PID
+            updateSpinner(
+                `${stateProgress} ${formatState(state)}: Loading localities...`,
+            );
             logger("Loading suburbs", state);
             const locality = await loadLocality(files, directory, state);
             loadContext.localityIndexed = {};
@@ -1015,6 +1059,9 @@ const initGNAFDataLoader = async (
             // Optionally load geocode data if geocoding is enabled
             if (ENABLE_GEO) {
                 // Load site geocodes (multiple geocodes per address site)
+                updateSpinner(
+                    `${stateProgress} ${formatState(state)}: Loading geocodes...`,
+                );
                 loadContext.geoIndexed = {};
                 await loadSiteGeo(
                     files,
@@ -1040,11 +1087,19 @@ const initGNAFDataLoader = async (
             }
 
             // Load and index the address details for this state
+            const expectedCount = filesCounts[detailFile] || 0;
+            updateSpinner(
+                `${stateProgress} ${formatState(state)}: Indexing ${formatNumber(expectedCount)} addresses...`,
+            );
             await loadGNAFAddress(
                 `${directory}/${detailFile}`,
                 filesCounts[detailFile],
                 loadContext as unknown as Types.MapPropertyContext,
                 { refresh },
+            );
+
+            succeedSpinner(
+                `${stateProgress} ${formatState(state)}: ${formatNumber(expectedCount)} addresses indexed`,
             );
         }
     }
@@ -1539,10 +1594,11 @@ export const loadCommandEntry = async ({
 
         // Register memory pressure callback to log warnings
         resourceMonitor.onMemoryPressure((snapshot) => {
-            logger(
-                `Memory pressure alert: ${Math.round(snapshot.freeMemory / (1024 * 1024))}MB free, ` +
-                    `heap: ${Math.round(snapshot.heapUsed / (1024 * 1024))}MB`,
-            );
+            const msg = `Memory pressure: ${formatBytes(snapshot.freeMemory)} free, heap: ${formatBytes(snapshot.heapUsed)}`;
+            logger(msg);
+            if (!getDaemonMode()) {
+                logWarning(msg);
+            }
         });
     }
 
@@ -1552,10 +1608,28 @@ export const loadCommandEntry = async ({
         clearAuthorityCodeMaps();
 
         // Step 1: Fetch the G-NAF ZIP file (downloads if not cached or outdated)
-        const file = await fetchGNAFArchive();
+        const fetchSpinner = startSpinner(
+            "Fetching G-NAF package information...",
+        );
+        let file: string;
+        try {
+            file = await fetchGNAFArchive();
+            succeedSpinner("G-NAF package located");
+        } catch (err) {
+            failSpinner("Failed to fetch G-NAF package");
+            throw err;
+        }
 
         // Step 2: Extract the ZIP file to a local directory
-        const unzipped = await unzipGNAFArchive(file);
+        const extractSpinner = startSpinner("Extracting G-NAF archive...");
+        let unzipped: string;
+        try {
+            unzipped = await unzipGNAFArchive(file);
+            succeedSpinner("G-NAF archive extracted");
+        } catch (err) {
+            failSpinner("Failed to extract G-NAF archive");
+            throw err;
+        }
 
         // Log the extracted directory path
         logger("Data dir", unzipped);
@@ -1570,15 +1644,18 @@ export const loadCommandEntry = async ({
         }
 
         // Step 4: Find the G-NAF subdirectory within the extracted contents
+        const locateSpinner = startSpinner("Locating G-NAF data directory...");
         const gnafDir = await glob("**/G-NAF/", { cwd: unzipped });
-        console.log(gnafDir);
+        logger("gnafDir", gnafDir);
 
         // Verify the G-NAF directory was found
         if (gnafDir.length === 0) {
+            failSpinner("G-NAF directory not found");
             throw new Error(
                 `Cannot find 'G-NAF' directory in Data dir '${unzipped}'`,
             );
         }
+        succeedSpinner("G-NAF data directory located");
 
         // Get the parent directory of the G-NAF folder (this is the main data directory)
         const mainDirectory = path.dirname(
@@ -1593,7 +1670,14 @@ export const loadCommandEntry = async ({
         }
 
         // Step 5: Load all G-NAF data from the main directory
-        await initGNAFDataLoader(mainDirectory, { refresh });
+        const loadSpinner = startSpinner("Loading address data into index...");
+        try {
+            await initGNAFDataLoader(mainDirectory, { refresh });
+            succeedSpinner("Address data loaded into index");
+        } catch (err) {
+            failSpinner("Failed to load address data");
+            throw err;
+        }
 
         // Log final resource state after loading completes
         if (resourceMonitor) {

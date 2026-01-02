@@ -4,7 +4,7 @@ import { Client } from "@opensearch-project/opensearch";
  */
 export declare const ELASTIC_PORT: number;
 declare global {
-    var esClient: Client | undefined;
+    var esClient: Client;
 }
 /**
  * Drops the configured OpenSearch index if it exists.

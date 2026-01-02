@@ -14,16 +14,6 @@ type SwaggerRequest = Request & {
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param res - Express response.
- *
- * @example
- * GET /
- *
- * Response Headers:
- * Link: </addresses>; rel="addresses", </docs/>; rel="describedby"
- * Link-Template: </addresses{?q,p}>; rel="addresses"
- *
- * Response Body:
- * {}
  */
 export declare function getApiRoot(request: SwaggerRequest, res: Response): void;
 export {};

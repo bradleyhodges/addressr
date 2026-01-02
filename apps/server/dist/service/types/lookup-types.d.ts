@@ -89,9 +89,10 @@ export type GetAddressesSuccessResponse = {
 export type GetAddressesErrorResponse = {
     /** HTTP status code for the error */
     statusCode: number;
-    /** Error details */
+    /** Error details with optional retry hint for circuit breaker scenarios */
     json: {
         error: string;
+        retryAfter?: number;
     };
 };
 /**

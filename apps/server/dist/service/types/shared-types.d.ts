@@ -1,3 +1,4 @@
+import { OpensearchApiResponse, OpensearchSearchResponse } from ".";
 export type BulkIndexBody = Array<Record<string, unknown>>;
 /**
  * Represents an address document ready for indexing into OpenSearch.
@@ -27,5 +28,15 @@ export type IndexableAddress = {
         /** Additional structured address fields */
         [key: string]: unknown;
     };
+};
+/**
+ * Metadata returned by searchForAddress to keep pagination and total handling
+ * consistent between the OpenSearch layer and HTTP response construction.
+ */
+export type SearchForAddressResult = {
+    searchResponse: OpensearchApiResponse<OpensearchSearchResponse<unknown>, unknown>;
+    page: number;
+    size: number;
+    totalHits: number;
 };
 //# sourceMappingURL=shared-types.d.ts.map

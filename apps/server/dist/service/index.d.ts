@@ -46,20 +46,24 @@ declare const setAddresses: (addr: Types.IndexableAddress[]) => Promise<void>;
  *
  * This function performs a multi-match query against the SLA and SSLA fields
  * with both bool_prefix and phrase_prefix matching for optimal autocomplete behavior.
+ * Results are cached using an LRU cache for frequently accessed queries, and
+ * operations are protected by a circuit breaker to handle OpenSearch failures gracefully.
  *
  * @augments autoCompleteAddress - This function is part of the autocomplete functionality
  *
  * @param searchString - The search string to match against addresses.
  * @param p - The page number (1-indexed, will be validated and clamped).
  * @param pageSize - The page size (will be validated and clamped to MAX_PAGE_SIZE).
- * @returns A promise resolving to the OpenSearch search response.
+ * @returns A promise resolving to the OpenSearch search response with pagination metadata.
+ * @throws {CircuitOpenError} If OpenSearch circuit is open due to repeated failures.
  */
-declare const searchForAddress: (searchString: string, p: number, pageSize?: number) => Promise<Types.OpensearchApiResponse<Types.OpensearchSearchResponse<unknown>, unknown>>;
+declare const searchForAddress: (searchString: string, p: number | undefined, pageSize?: number | undefined) => Promise<Types.SearchForAddressResult>;
 /**
  * Retrieves detailed information about a specific address by its ID.
  *
  * This function queries OpenSearch for the address document, constructs the
  * response with proper HATEOAS links, and generates an ETag hash for caching.
+ * Operations are protected by a circuit breaker to handle OpenSearch failures gracefully.
  *
  * @param {string} addressId - The unique identifier for the address (G-NAF PID).
  * @returns {Promise<Types.GetAddressResponse>} A promise resolving to either:

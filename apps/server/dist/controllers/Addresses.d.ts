@@ -42,15 +42,6 @@ type SwaggerRequest = Request & {
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses/GANSW717042159
- *
- * Response:
- * {
- *   "sla": "UNIT 1, 123 MAIN STREET, SYDNEY NSW 2000",
- *   "structured": { ... }
- * }
  */
 export declare function getAddress(request: SwaggerRequest, response: Response): void;
 /**
@@ -62,18 +53,6 @@ export declare function getAddress(request: SwaggerRequest, response: Response):
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses?q=123%20main%20st&p=1
- *
- * Response:
- * [
- *   {
- *     "sla": "123 MAIN STREET, SYDNEY NSW 2000",
- *     "score": 45.2,
- *     "links": { "self": { "href": "/addresses/GANSW717042159" } }
- *   }
- * ]
  */
 export declare function getAddresses(request: SwaggerRequest, response: Response): void;
 export {};

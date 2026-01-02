@@ -153,24 +153,6 @@ export class CircuitOpenError extends Error {
  * The circuit breaker monitors operation success/failure rates and opens
  * (fails fast) when too many failures occur. This prevents cascading
  * failures and gives the downstream service time to recover.
- *
- * @example
- * ```typescript
- * const breaker = new CircuitBreaker({
- *   name: 'opensearch',
- *   failureThreshold: 5,
- *   resetTimeoutMs: 30000,
- * });
- *
- * // Wrap operations with the circuit breaker
- * try {
- *   const result = await breaker.execute(() => esClient.search({ ... }));
- * } catch (error) {
- *   if (error instanceof CircuitOpenError) {
- *     // Service is unavailable, return cached data or error
- *   }
- * }
- * ```
  */
 export class CircuitBreaker {
     /** Current state of the circuit */

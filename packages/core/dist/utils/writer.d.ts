@@ -1,4 +1,7 @@
-type JsonResponse = {
+/**
+ * Express-style response instance.
+ */
+export type JsonResponse = {
     status: (code: number) => JsonResponse;
     setHeader: (name: string, value: string) => JsonResponse;
     json: (body: unknown) => void;
@@ -7,7 +10,13 @@ type JsonResponse = {
  * Structured payload carrying a status code and serialized body.
  */
 export declare class ResponsePayload<T> {
+    /**
+     * The HTTP status code to return.
+     */
     code: number;
+    /**
+     * The response body to serialize as JSON.
+     */
     payload: T;
     /**
      * @param {number} code - HTTP status code to return.
@@ -34,5 +43,4 @@ export declare function respondWithCode<T>(code: number, payload: T): ResponsePa
  * @returns {void} Nothing.
  */
 export declare function writeJson<T>(response: JsonResponse, bodyOrPayload: T | ResponsePayload<T>, statusOverride?: number): void;
-export {};
 //# sourceMappingURL=writer.d.ts.map

@@ -26,7 +26,6 @@ type AddressResponse = {
  * Swagger-tools middleware attaches parsed parameters and metadata.
  */
 type SwaggerRequest = Request & {
-    // biome-ignore lint/suspicious/noExplicitAny: swagger-tools augments request at runtime with untyped data
     swagger: {
         /** Parsed and validated request parameters */
         params: {
@@ -96,15 +95,6 @@ const writeErrorResponse = (
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses/GANSW717042159
- *
- * Response:
- * {
- *   "sla": "UNIT 1, 123 MAIN STREET, SYDNEY NSW 2000",
- *   "structured": { ... }
- * }
  */
 export function getAddress(request: SwaggerRequest, response: Response): void {
     // Log the incoming request for debugging
@@ -165,18 +155,6 @@ export function getAddress(request: SwaggerRequest, response: Response): void {
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses?q=123%20main%20st&p=1
- *
- * Response:
- * [
- *   {
- *     "sla": "123 MAIN STREET, SYDNEY NSW 2000",
- *     "score": 45.2,
- *     "links": { "self": { "href": "/addresses/GANSW717042159" } }
- *   }
- * ]
  */
 export function getAddresses(
     request: SwaggerRequest,

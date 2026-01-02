@@ -12,6 +12,6 @@
         "types": ["node"],
         "typeRoots": ["./types", "./node_modules/@types"]
     },
-    "include": ["**/*.ts", "**/*.d.ts"],
-    "exclude": ["service/address-service.js"]
+    "include": ["**/*.ts"],
+    "exclude": ["service/address-service.js", "dist/**/*", "node_modules/**/*"]
 }

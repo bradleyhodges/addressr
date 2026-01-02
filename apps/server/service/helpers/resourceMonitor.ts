@@ -130,25 +130,6 @@ export type MemoryPressureCallback = (snapshot: ResourceSnapshot) => void;
  * This class detects available memory and CPU resources at runtime, calculates
  * optimal chunk sizes for G-NAF parsing, and provides hooks for memory pressure
  * events to enable adaptive throttling during loading operations.
- *
- * @example
- * ```typescript
- * const monitor = ResourceMonitor.getInstance();
- *
- * // Get current resource state
- * const snapshot = monitor.getSnapshot();
- * console.log(`Optimal chunk size: ${snapshot.optimalChunkSizeMB}MB`);
- *
- * // Register for memory pressure events
- * monitor.onMemoryPressure((snapshot) => {
- *   console.log('Memory pressure detected, throttling...');
- * });
- *
- * // Start monitoring during loading
- * monitor.startMonitoring();
- * // ... loading operations ...
- * monitor.stopMonitoring();
- * ```
  */
 export class ResourceMonitor {
     /** Singleton instance */

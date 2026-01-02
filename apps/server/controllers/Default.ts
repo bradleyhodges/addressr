@@ -7,7 +7,6 @@ import { getApiRoot as fetchApiRoot } from "../service/DefaultService";
  * Extended Express Request with Swagger-tools augmentation.
  */
 type SwaggerRequest = Request & {
-    // biome-ignore lint/suspicious/noExplicitAny: swagger-tools augments request at runtime with untyped data
     swagger: unknown;
 };
 
@@ -25,16 +24,6 @@ const errorLogger = debug("error:default");
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param res - Express response.
- *
- * @example
- * GET /
- *
- * Response Headers:
- * Link: </addresses>; rel="addresses", </docs/>; rel="describedby"
- * Link-Template: </addresses{?q,p}>; rel="addresses"
- *
- * Response Body:
- * {}
  */
 export function getApiRoot(request: SwaggerRequest, res: Response): void {
     // Fetch the API root link relations from the service

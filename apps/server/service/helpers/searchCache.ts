@@ -111,23 +111,6 @@ export type CacheConfig = {
  * periodic maintenance.
  *
  * @template T - The type of values stored in the cache.
- *
- * @example
- * ```typescript
- * const cache = new LRUCache<SearchResult[]>({ maxEntries: 500, ttlMs: 60000 });
- *
- * // Store a result
- * cache.set('sydney', searchResults);
- *
- * // Retrieve if present
- * const cached = cache.get('sydney');
- * if (cached !== undefined) {
- *   return cached;
- * }
- *
- * // Check stats
- * console.log(cache.getStats());
- * ```
  */
 export class LRUCache<T> {
     /** The underlying storage Map */

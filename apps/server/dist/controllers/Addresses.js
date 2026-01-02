@@ -41,15 +41,6 @@ const writeErrorResponse = (response, statusCode, message, errorDetails) => {
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses/GANSW717042159
- *
- * Response:
- * {
- *   "sla": "UNIT 1, 123 MAIN STREET, SYDNEY NSW 2000",
- *   "structured": { ... }
- * }
  */
 function getAddress(request, response) {
     // Log the incoming request for debugging
@@ -94,18 +85,6 @@ function getAddress(request, response) {
  *
  * @param request - Express request augmented with Swagger metadata.
  * @param response - Express response.
- *
- * @example
- * GET /addresses?q=123%20main%20st&p=1
- *
- * Response:
- * [
- *   {
- *     "sla": "123 MAIN STREET, SYDNEY NSW 2000",
- *     "score": 45.2,
- *     "links": { "self": { "href": "/addresses/GANSW717042159" } }
- *   }
- * ]
  */
 function getAddresses(request, response) {
     // Extract search query and page number from validated Swagger parameters

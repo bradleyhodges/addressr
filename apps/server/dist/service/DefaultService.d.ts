@@ -20,11 +20,6 @@ type ApiRootResponse = {
  *
  * @returns A promise resolving to the API root response with HATEOAS links.
  * @throws {Error} If the Swagger document is not available.
- *
- * @example
- * Response Headers:
- * Link: </addresses>; rel="addresses"; title="Get addresses"
- * Link-Template: </addresses{?q,p}>; rel="addresses"; title="Get addresses"
  */
 export declare function getApiRoot(): Promise<ApiRootResponse>;
 export {};
