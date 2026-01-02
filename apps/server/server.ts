@@ -18,15 +18,15 @@ const logger = debug("api");
 async function bootstrap(): Promise<void> {
     // Start the server
     await startServer();
-    logger("server started");
+    if (VERBOSE) logger("server started");
 
     // Connect to the Elasticsearch client
-    logger("connecting es client");
+    if (VERBOSE) logger("connecting es client");
     const esClient = await esConnect();
 
     // Set the Elasticsearch client on the global scope
     global.esClient = esClient;
-    logger("es client connected");
+    if (VERBOSE) logger("es client connected");
 
     // Print the version and environment
     console.log("=======================");
@@ -42,6 +42,6 @@ async function bootstrap(): Promise<void> {
  * @returns {Promise<void>}
  */
 void bootstrap().catch((error) => {
-    logger("server bootstrap failed", error);
+    if (VERBOSE) logger("server bootstrap failed", error);
     throw error;
 });

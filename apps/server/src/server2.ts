@@ -22,7 +22,7 @@ async function connectElasticSearchClient(): Promise<void> {
 
     // Set the Elasticsearch client on the global namespace
     global.esClient = esClient;
-    logger("es client connected");
+    if (VERBOSE) logger("es client connected");
 }
 
 /**
@@ -33,11 +33,11 @@ async function connectElasticSearchClient(): Promise<void> {
  */
 async function bootstrapServer(): Promise<void> {
     // Start the REST server
-    logger("starting REST server");
+    if (VERBOSE) logger("starting REST server");
     await startRest2Server();
 
     // Connect to Elasticsearch
-    logger("connecting es client");
+    if (VERBOSE) logger("connecting es client");
     await connectElasticSearchClient();
 
     // Print the version and environment

@@ -9,7 +9,6 @@ import { esConnect } from "@repo/addresskit-client/elasticsearch";
 import debug from "debug";
 import service from "../../service";
 import {
-    displayBanner,
     displayBox,
     displayKeyValue,
     displaySection,
@@ -17,16 +16,12 @@ import {
     formatDuration,
     formatState,
     getDaemonMode,
-    logDebug,
     logError,
-    logInfo,
     logSuccess,
-    logWarning,
     startSpinner,
     succeedSpinner,
-    theme,
-    warnSpinner,
 } from "../../service/helpers/terminalUI";
+import { VERBOSE } from "../../service/config";
 
 /** Debug logger for API operations */
 const logger = debug("api");
@@ -89,7 +84,7 @@ export async function runLoadCommand(
     try {
         await esConnect();
         succeedSpinner("Connected to OpenSearch");
-        logger("es client connected");
+        if (VERBOSE) logger("es client connected");
     } catch (err) {
         failSpinner("Failed to connect to OpenSearch");
         logError("Connection error", err as Error);
@@ -145,7 +140,7 @@ export async function runLoadCommand(
         console.log = originalLog;
 
         succeedSpinner("G-NAF data loaded successfully");
-        logger("data loaded");
+        if (VERBOSE) logger("data loaded");
 
         // Display completion summary
         const duration = Date.now() - startTime;

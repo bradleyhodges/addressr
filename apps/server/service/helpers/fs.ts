@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as Papa from "papaparse";
 import { error, fsp, logger, readdir } from "../index";
+import { VERBOSE } from "../config";
 
 /**
  * Gets the files from the given directory.
@@ -21,7 +22,7 @@ export const getFiles = async (
     const dir = path.resolve(baseDir, currentDir);
 
     // Log the directory
-    logger(`reading ${dir} (${currentDir} in ${baseDir})`);
+    if (VERBOSE) logger(`reading ${dir} (${currentDir} in ${baseDir})`);
 
     // Get the directory entries
     const dirents = await readdir(dir, { withFileTypes: true });
@@ -152,7 +153,7 @@ export const loadFileCounts = async (
              * Once completed, log for audit and resolve to allow the result to be returned.
              */
             complete: () => {
-                logger("GNAF data loaded");
+                if (VERBOSE) logger("GNAF data loaded");
                 resolve();
             },
             /**
@@ -166,7 +167,7 @@ export const loadFileCounts = async (
     });
 
     // Log the files counts
-    logger("filesCounts", filesCounts);
+    if (VERBOSE) logger("filesCounts", filesCounts);
 
     // Return the files counts
     return filesCounts;

@@ -1,6 +1,7 @@
 import debug from "debug";
 import LinkHeader = require("http-link-header");
 import { setLinkOptions } from "./setLinkOptions";
+import { VERBOSE } from "./config";
 
 /**
  * The logger for the API root service.
@@ -67,7 +68,7 @@ const isSwaggerDocAvailable = (): boolean => {
 export async function getApiRoot(): Promise<ApiRootResponse> {
     // Verify Swagger document is loaded before proceeding
     if (!isSwaggerDocAvailable()) {
-        logger("Swagger document not available");
+        if (VERBOSE) logger("Swagger document not available");
         throw new Error("API documentation not loaded");
     }
 
@@ -128,7 +129,7 @@ export async function getApiRoot(): Promise<ApiRootResponse> {
             .get as SwaggerOperation;
 
         // Log the operation for debugging
-        logger("Adding link template for:", op.operationId);
+        if (VERBOSE) logger("Adding link template for:", op.operationId);
 
         // Set the link options (adds templated URI with query parameters)
         setLinkOptions(op, url, linkTemplate);

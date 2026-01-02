@@ -14,6 +14,7 @@
  */
 
 import debug from "debug";
+import { VERBOSE } from "../config";
 
 // ---------------------------------------------------------------------------------
 // Debug Loggers
@@ -520,7 +521,7 @@ export class CircuitBreaker {
             this.resetTimeout = undefined;
         }
         this.operationHistory = [];
-        logger(`Circuit '${this.config.name}' destroyed`);
+        if (VERBOSE) logger(`Circuit '${this.config.name}' destroyed`);
     }
 }
 

@@ -11,6 +11,7 @@
 
 import * as os from "node:os";
 import debug from "debug";
+import { VERBOSE } from "../config";
 
 // ---------------------------------------------------------------------------------
 // Debug Loggers
@@ -167,8 +168,9 @@ export class ResourceMonitor {
         };
 
         // Log initial resource state on creation
-        logger("ResourceMonitor initialized with config:", this.config);
-        logger("Initial resource state:", this.getSnapshot());
+        if (VERBOSE)
+            logger("ResourceMonitor initialized with config:", this.config);
+        if (VERBOSE) logger("Initial resource state:", this.getSnapshot());
     }
 
     /**
@@ -275,7 +277,8 @@ export class ResourceMonitor {
 
         // Reduce concurrency if under memory pressure
         if (snapshot.memoryPressure) {
-            logger("Memory pressure detected, reducing concurrency to 1");
+            if (VERBOSE)
+                logger("Memory pressure detected, reducing concurrency to 1");
             return 1;
         }
 
@@ -322,12 +325,12 @@ export class ResourceMonitor {
     public startMonitoring(): void {
         // Avoid duplicate monitoring intervals
         if (this.isMonitoring) {
-            logger("Monitoring already active, skipping start");
+            if (VERBOSE) logger("Monitoring already active, skipping start");
             return;
         }
 
         this.isMonitoring = true;
-        logger("Starting resource monitoring");
+        if (VERBOSE) logger("Starting resource monitoring");
 
         // Set up periodic monitoring
         this.monitoringInterval = setInterval(() => {
@@ -347,7 +350,7 @@ export class ResourceMonitor {
         }
 
         this.isMonitoring = false;
-        logger("Stopping resource monitoring");
+        if (VERBOSE) logger("Stopping resource monitoring");
 
         if (this.monitoringInterval !== undefined) {
             clearInterval(this.monitoringInterval);
@@ -404,13 +407,14 @@ export class ResourceMonitor {
         // Check if gc() is exposed (requires --expose-gc V8 flag)
         // biome-ignore lint/suspicious/noExplicitAny: Accessing global gc() which may not exist
         if (typeof (global as any).gc === "function") {
-            logger("Forcing garbage collection");
+            if (VERBOSE) logger("Forcing garbage collection");
             // biome-ignore lint/suspicious/noExplicitAny: Accessing global gc() which may not exist
             (global as any).gc();
             return true;
         }
 
-        logger("Garbage collection not available (run with --expose-gc)");
+        if (VERBOSE)
+            logger("Garbage collection not available (run with --expose-gc)");
         return false;
     }
 
@@ -423,16 +427,21 @@ export class ResourceMonitor {
         const formatMB = (bytes: number): string =>
             `${Math.round(bytes / (1024 * 1024))}MB`;
 
-        logger("=== Resource Report ===");
-        logger(`Total Memory:     ${formatMB(snapshot.totalMemory)}`);
-        logger(`Free Memory:      ${formatMB(snapshot.freeMemory)}`);
-        logger(`Process RSS:      ${formatMB(snapshot.processMemory)}`);
-        logger(`Heap Used:        ${formatMB(snapshot.heapUsed)}`);
-        logger(`Heap Total:       ${formatMB(snapshot.heapTotal)}`);
-        logger(`CPU Cores:        ${snapshot.cpuCount}`);
-        logger(`Optimal Chunk:    ${snapshot.optimalChunkSizeMB}MB`);
-        logger(`Memory Pressure:  ${snapshot.memoryPressure}`);
-        logger("========================");
+        if (VERBOSE) logger("=== Resource Report ===");
+        if (VERBOSE)
+            logger(`Total Memory:     ${formatMB(snapshot.totalMemory)}`);
+        if (VERBOSE)
+            logger(`Free Memory:      ${formatMB(snapshot.freeMemory)}`);
+        if (VERBOSE)
+            logger(`Process RSS:      ${formatMB(snapshot.processMemory)}`);
+        if (VERBOSE) logger(`Heap Used:        ${formatMB(snapshot.heapUsed)}`);
+        if (VERBOSE)
+            logger(`Heap Total:       ${formatMB(snapshot.heapTotal)}`);
+        if (VERBOSE) logger(`CPU Cores:        ${snapshot.cpuCount}`);
+        if (VERBOSE)
+            logger(`Optimal Chunk:    ${snapshot.optimalChunkSizeMB}MB`);
+        if (VERBOSE) logger(`Memory Pressure:  ${snapshot.memoryPressure}`);
+        if (VERBOSE) logger("========================");
     }
 }
 
@@ -499,7 +508,7 @@ export const waitForMemory = async (
         ResourceMonitor.getInstance().tryForceGC();
 
         // Wait before checking again
-        logger(`Waiting for memory (${checkIntervalMs}ms)...`);
+        if (VERBOSE) logger(`Waiting for memory (${checkIntervalMs}ms)...`);
         await new Promise<void>((resolve) =>
             setTimeout(resolve, checkIntervalMs),
         );

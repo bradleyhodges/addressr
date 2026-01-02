@@ -29,7 +29,7 @@ async function runLoader(): Promise<void> {
 
     // Connect to the Elasticsearch client
     await esConnect();
-    logger("es client connected");
+    if (VERBOSE) logger("es client connected");
 
     // Print the version and environment
     console.log("======================");
@@ -39,12 +39,12 @@ async function runLoader(): Promise<void> {
 
     // Load the G-NAF data
     await service.load();
-    logger("data loaded");
+    if (VERBOSE) logger("data loaded");
 
     // Get the end time
     const end = process.hrtime(start);
-    logger(`Execution time: ${end[0]}s ${end[1] / 1_000_000}ms`);
-    logger("Fin");
+    if (VERBOSE) logger(`Execution time: ${end[0]}s ${end[1] / 1_000_000}ms`);
+    if (VERBOSE) logger("Fin");
 }
 
 /**

@@ -75,7 +75,7 @@ export async function dropIndex(esClient: Client): Promise<void> {
     const postExists = await esClient.indices.exists({ index: ES_INDEX_NAME });
 
     // Log the result
-    logger("index exists:", postExists);
+    if (VERBOSE) logger("index exists:", postExists);
 }
 
 /**
@@ -112,7 +112,7 @@ export async function initIndex(
 
     // Check if the index exists
     const exists = await esClient.indices.exists({ index: ES_INDEX_NAME });
-    logger("index exists:", exists.body);
+    if (VERBOSE) logger("index exists:", exists.body);
 
     // Build the index body
     const indexBody: IndexBody = {
@@ -185,7 +185,7 @@ export async function initIndex(
 
     // If the index does not exist, create it
     if (exists.body !== true) {
-        logger(`creating index: ${ES_INDEX_NAME}`);
+        if (VERBOSE) logger(`creating index: ${ES_INDEX_NAME}`);
         const indexCreateResult = await esClient.indices.create({
             index: ES_INDEX_NAME,
             body: indexBody,
@@ -224,7 +224,10 @@ export async function initIndex(
     });
 
     // Log the result
-    logger(`indexGetResult:\n${JSON.stringify(indexGetResult, undefined, 2)}`);
+    if (VERBOSE)
+        logger(
+            `indexGetResult:\n${JSON.stringify(indexGetResult, undefined, 2)}`,
+        );
 }
 
 /**
@@ -246,7 +249,8 @@ export async function esConnect(
     // Keep trying until the host:port is reachable.
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        logger(`trying to reach elastic search on ${eshost}:${esport}...`);
+        if (VERBOSE)
+            logger(`trying to reach elastic search on ${eshost}:${esport}...`);
         try {
             // Check if the host:port is reachable
             const open = await waitPort({
@@ -258,7 +262,7 @@ export async function esConnect(
 
             // If the host:port is reachable, log it
             if (open) {
-                logger(`...${eshost}:${esport} is reachable`);
+                if (VERBOSE) logger(`...${eshost}:${esport} is reachable`);
 
                 // Keep retrying client creation until OpenSearch responds.
                 // eslint-disable-next-line no-constant-condition
@@ -283,7 +287,8 @@ export async function esConnect(
 
                         // Ping the client
                         await esClient.ping();
-                        logger(`...connected to ${eshost}:${esport}`);
+                        if (VERBOSE)
+                            logger(`...connected to ${eshost}:${esport}`);
 
                         // Set the client in the global scope
                         global.esClient = esClient;
@@ -301,7 +306,7 @@ export async function esConnect(
                         });
 
                         // Log the retry
-                        logger("retrying...");
+                        if (VERBOSE) logger("retrying...");
                     }
                 }
             }
@@ -314,7 +319,7 @@ export async function esConnect(
             await new Promise((resolve) => {
                 setTimeout(() => resolve(undefined), interval);
             });
-            logger("retrying...");
+            if (VERBOSE) logger("retrying...");
         }
     }
 }

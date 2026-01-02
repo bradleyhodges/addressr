@@ -335,3 +335,11 @@ export const DYNAMIC_RESOURCES_ENABLED =
 export const TARGET_MEMORY_UTILIZATION = Number.parseFloat(
     process.env.ADDRESSKIT_TARGET_MEMORY_UTILIZATION ?? "0.7",
 );
+
+/**
+ * Whether to enable verbose logging.
+ *
+ * @default false
+ * @env VERBOSE
+ */
+export const VERBOSE = process.env.VERBOSE === "true";

@@ -44,7 +44,7 @@ export default function streamDown(
 
             // Create a progress bar
             const progressBar = new ProgressBar(
-                "  downloading [:bar] :rate/bps :percent :etas",
+                "Downloading G-NAF file... [:bar] :rate/bps (:percent complete) ETA: :etas remaining",
                 {
                     complete: "=",
                     incomplete: " ",

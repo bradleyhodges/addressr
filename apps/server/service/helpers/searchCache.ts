@@ -9,6 +9,7 @@
  */
 
 import debug from "debug";
+import { VERBOSE } from "../config";
 
 // ---------------------------------------------------------------------------------
 // Debug Loggers
@@ -170,7 +171,7 @@ export class LRUCache<T> {
         // Cache miss - entry not found
         if (entry === undefined) {
             this.stats.misses++;
-            logger(`Cache MISS: "${key.substring(0, 50)}..."`);
+            if (VERBOSE) logger(`Cache MISS: "${key.substring(0, 50)}..."`);
             return undefined;
         }
 
@@ -181,7 +182,7 @@ export class LRUCache<T> {
             this.cache.delete(key);
             this.stats.ttlEvictions++;
             this.stats.misses++;
-            logger(`Cache EXPIRED: "${key.substring(0, 50)}..."`);
+            if (VERBOSE) logger(`Cache EXPIRED: "${key.substring(0, 50)}..."`);
             return undefined;
         }
 
@@ -264,7 +265,7 @@ export class LRUCache<T> {
     public delete(key: string): boolean {
         const deleted = this.cache.delete(key);
         if (deleted) {
-            logger(`Cache DELETE: "${key.substring(0, 50)}..."`);
+            if (VERBOSE) logger(`Cache DELETE: "${key.substring(0, 50)}..."`);
         }
         return deleted;
     }
@@ -275,7 +276,7 @@ export class LRUCache<T> {
     public clear(): void {
         const size = this.cache.size;
         this.cache.clear();
-        logger(`Cache CLEAR: removed ${size} entries`);
+        if (VERBOSE) logger(`Cache CLEAR: removed ${size} entries`);
     }
 
     /**
@@ -308,7 +309,7 @@ export class LRUCache<T> {
             ttlEvictions: 0,
             lruEvictions: 0,
         };
-        logger("Cache stats reset");
+        if (VERBOSE) logger("Cache stats reset");
     }
 
     /**
@@ -348,7 +349,8 @@ export class LRUCache<T> {
         }
 
         if (evicted > 0) {
-            logger(`Cache maintenance: evicted ${evicted} expired entries`);
+            if (VERBOSE)
+                logger(`Cache maintenance: evicted ${evicted} expired entries`);
         }
     }
 
@@ -374,7 +376,7 @@ export class LRUCache<T> {
         }
 
         this.cache.clear();
-        logger("LRU cache destroyed");
+        if (VERBOSE) logger("LRU cache destroyed");
     }
 }
 

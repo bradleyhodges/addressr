@@ -21,6 +21,7 @@ import {
     theme,
 } from "../../service/helpers/terminalUI";
 import { startRest2Server } from "../../src/waycharterServer";
+import { VERBOSE } from "../../service/config";
 
 /** Debug logger for API operations */
 const logger = debug("api");
@@ -88,7 +89,7 @@ export async function runStartCommand(
 
     const serverSpinner = startSpinner("Starting REST API server...");
     try {
-        logger("starting REST server");
+        if (VERBOSE) logger("starting REST server");
         await startRest2Server();
         succeedSpinner(
             `REST API server started on port ${theme.highlight(port)}`,
@@ -102,11 +103,11 @@ export async function runStartCommand(
     // Connect to OpenSearch
     const esSpinner = startSpinner("Connecting to OpenSearch...");
     try {
-        logger("connecting es client");
+        if (VERBOSE) logger("connecting es client");
         const esClient = await esConnect();
         global.esClient = esClient;
         succeedSpinner("Connected to OpenSearch");
-        logger("es client connected");
+        if (VERBOSE) logger("es client connected");
     } catch (err) {
         failSpinner("Failed to connect to OpenSearch");
         logError("OpenSearch connection error", err as Error);

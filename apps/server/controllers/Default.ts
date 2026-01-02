@@ -2,6 +2,7 @@ import { writeJson } from "@repo/addresskit-core";
 import debug from "debug";
 import type { Request, Response } from "express";
 import { getApiRoot as fetchApiRoot } from "../service/DefaultService";
+import { VERBOSE } from "../service/config";
 
 /**
  * Extended Express Request with Swagger-tools augmentation.
@@ -40,7 +41,7 @@ export function getApiRoot(request: SwaggerRequest, res: Response): void {
         })
         .catch((error: unknown) => {
             // Log the error for debugging
-            errorLogger("Error fetching API root", error);
+            if (VERBOSE) errorLogger("Error fetching API root", error);
 
             // Return a standardized error response
             res.setHeader("Content-Type", "application/json");

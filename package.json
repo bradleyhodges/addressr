@@ -1,6 +1,6 @@
 {
     "name": "@bradleyhodges/addresskit",
-    "version": "2.0.0",
+    "version": "2.1.3",
     "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
     "packageManager": "pnpm@10.22.0",
     "publishConfig": {
@@ -27,6 +27,7 @@
         "format": "biome check . --write --skip-errors",
         "clean": "git clean -xdf node_modules",
         "gen-install-cmd": "echo \"#!/bin/sh\n\nnpm install -g ${npm_package_name}@${npm_package_version}\" > install.sh",
+        "package": "pnpm run genversion",
         "deploy:prod": "deploy/deploy.sh",
         "deploy:test": "deploy/deploy.sh",
         "turbo:build": "turbo run build --filter=!@bradleyhodges/addresskit",
@@ -82,7 +83,7 @@
         "test:nogeo": "NO_STRICT=' ' npm-run-all --serial test:nodejs:nogeo test:rest:nogeo test:cli:nogeo",
         "test:geo": "NO_STRICT=' ' npm-run-all --serial test:nodejs:geo test:rest:geo test:cli:geo",
         "watch:test": "nodemon -V  --ext \"*.feature, *.js, *.json, *.css, *.yaml\" -x npm -- run test",
-        "genversion": "genversion --es6 --semi ./packages/core/version.js",
+        "genversion": "genversion -p ./ --es6 --double ./packages/core/version.ts",
         "pretest:nodejs:nogeo": "npm run genversion",
         "test:nodejs:nogeo": "ES_INDEX_NAME=test COVERED_STATES=OT DEBUG=error,api,express:*,swagger-tools*,test,es TEST_PROFILE=default cucumber-js -p default -- --harmony_async_iteration",
         "cover:nodejs:nogeo": "nyc --report-dir coverage/nodejs --temp-dir coverage/nodejs/.nyc_output npm run test:nodejs:nogeo",

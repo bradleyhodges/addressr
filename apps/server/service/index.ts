@@ -13,7 +13,7 @@ import {
     MAX_PAGE_SIZE,
     PAGE_SIZE,
 } from "./conf";
-import { CACHE_ENABLED } from "./config";
+import { CACHE_ENABLED, VERBOSE } from "./config";
 import {
     type CachedSearchResult,
     CircuitOpenError,
@@ -201,7 +201,7 @@ const searchForAddress = async (
     if (CACHE_ENABLED) {
         const cached = getSearchCache().get(cacheKey);
         if (cached !== undefined) {
-            logger("Cache HIT for search:", normalizedSearch);
+            if (VERBOSE) logger("Cache HIT for search:", normalizedSearch);
             // Return cached result wrapped in expected format
             return {
                 searchResponse: {
@@ -336,11 +336,12 @@ const searchForAddress = async (
             size: validSize,
         };
         getSearchCache().set(cacheKey, cacheEntry);
-        logger("Cache SET for search:", normalizedSearch);
+        if (VERBOSE) logger("Cache SET for search:", normalizedSearch);
     }
 
     // Log the hits
-    logger("hits", JSON.stringify(searchResp.body.hits, undefined, 2));
+    if (VERBOSE)
+        logger("hits", JSON.stringify(searchResp.body.hits, undefined, 2));
     return {
         searchResponse: searchResp,
         page: validPage,
@@ -378,7 +379,7 @@ const getAddress = async (
             });
         });
 
-        logger("jsonX", jsonX);
+        if (VERBOSE) logger("jsonX", jsonX);
 
         // Extract the source data from OpenSearch response
         const source = jsonX.body._source;
@@ -435,7 +436,7 @@ const getAddress = async (
         const resource = buildAddressResource(addressId, attributes);
         const jsonApiDocument = buildAddressDetailDocument(resource);
 
-        logger("jsonApiDocument", jsonApiDocument);
+        if (VERBOSE) logger("jsonApiDocument", jsonApiDocument);
 
         // Construct HATEOAS self-link for the address resource
         const link = new LinkHeader();
@@ -543,7 +544,7 @@ const getAddresses = async (
             size,
             totalHits,
         } = await searchForAddress(normalizedQuery, p);
-        logger("foundAddresses", foundAddresses);
+        if (VERBOSE) logger("foundAddresses", foundAddresses);
 
         // Calculate pagination values
         const totalPages = Math.ceil(totalHits / size);
@@ -632,12 +633,12 @@ const getAddresses = async (
             });
         }
 
-        logger("TOTAL", totalHits);
-        logger("PAGE_SIZE * p", size * page);
+        if (VERBOSE) logger("TOTAL", totalHits);
+        if (VERBOSE) logger("PAGE_SIZE * p", size * page);
 
         // Determine if there are more pages available
         const hasNextPage = totalHits > size * page;
-        logger("next?", hasNextPage);
+        if (VERBOSE) logger("next?", hasNextPage);
 
         // Add next page link if more results exist
         if (hasNextPage) {

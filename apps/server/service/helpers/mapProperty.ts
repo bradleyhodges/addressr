@@ -28,6 +28,7 @@ import {
     streetSuffixCodeToName,
     streetTypeCodeToName,
 } from "./propertyCodeToName";
+import { VERBOSE } from "../config";
 
 /**
  * Maps a locality object to a structured locality object.
@@ -270,7 +271,7 @@ export const mapToMla = (s: StructuredAddress): string[] => {
     );
 
     if (fla.length > 4) {
-        logger("FLA TOO LONG", fla, s);
+        if (VERBOSE) logger("FLA TOO LONG", fla, s);
         throw new Error("FLA TOO LONG");
     }
     return fla;
@@ -328,7 +329,7 @@ export const mapToShortMla = (s: StructuredAddress): string[] => {
     );
 
     if (fla.length > 4) {
-        logger("FLA TOO LONG", fla, s);
+        if (VERBOSE) logger("FLA TOO LONG", fla, s);
         throw new Error("FLA TOO LONG");
     }
     return fla;
@@ -519,12 +520,12 @@ export const mapAddressDetails = (
             Math.ceil(count / 100) !== 0 &&
             i % Math.ceil(count / 100) === 0
         ) {
-            logger("addr", JSON.stringify(rval, undefined, 2));
-            logger(`${(i / count) * 100}%`);
+            if (VERBOSE) logger("addr", JSON.stringify(rval, undefined, 2));
+            if (VERBOSE) logger(`${(i / count) * 100}%`);
         }
     } else if ((i || 0) % 10000 === 0) {
-        logger("addr", JSON.stringify(rval, undefined, 2));
-        logger(`${i} rows`);
+        if (VERBOSE) logger("addr", JSON.stringify(rval, undefined, 2));
+        if (VERBOSE) logger(`${i} rows`);
     }
     return rval;
 };

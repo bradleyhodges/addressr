@@ -6,6 +6,7 @@ import {
     getAddresses as fetchAddresses,
 } from "../service";
 import { JSONAPI_CONTENT_TYPE } from "../service/helpers/jsonapi";
+import { VERBOSE } from "../service/config";
 
 /**
  * Structured response from address service functions.
@@ -78,7 +79,8 @@ const writeErrorResponse = (
 ): void => {
     // Log the error details for debugging (not exposed to client)
     if (errorDetails !== undefined) {
-        errorLogger(`Error [${statusCode}]: ${message}`, errorDetails);
+        if (VERBOSE)
+            errorLogger(`Error [${statusCode}]: ${message}`, errorDetails);
     }
 
     // Set response headers and send JSON:API error payload
@@ -107,7 +109,7 @@ const writeErrorResponse = (
  */
 export function getAddress(request: SwaggerRequest, response: Response): void {
     // Log the incoming request for debugging
-    logger("IN getAddress");
+    if (VERBOSE) logger("IN getAddress");
 
     // Extract the address ID from the validated Swagger parameters
     const addressId = request.swagger.params.addressId?.value;
