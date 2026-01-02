@@ -6,106 +6,234 @@ import {
     getAddresses as fetchAddresses,
 } from "../service";
 
+/**
+ * Structured response from address service functions.
+ * May contain either success data (link, json) or error data (statusCode, json).
+ */
 type AddressResponse = {
+    /** HTTP status code for error responses */
     statusCode?: number;
+    /** Response body payload */
     json: unknown;
+    /** HATEOAS Link header for navigation */
     link?: { toString(): string };
+    /** Link-Template header for API discoverability */
     linkTemplate?: { toString(): string };
 };
 
+/**
+ * Extended Express Request with Swagger-tools augmentation.
+ * Swagger-tools middleware attaches parsed parameters and metadata.
+ */
 type SwaggerRequest = Request & {
-    // biome-ignore lint/suspicious/noExplicitAny: swagger-tools augments request at runtime
-    swagger: any;
+    // biome-ignore lint/suspicious/noExplicitAny: swagger-tools augments request at runtime with untyped data
+    swagger: {
+        /** Parsed and validated request parameters */
+        params: {
+            addressId?: { value: string };
+            q?: { value: string | undefined };
+            p?: { value: number | undefined };
+        };
+        /** Swagger path definition for the matched route */
+        path?: {
+            get?: {
+                operationId?: string;
+                "x-swagger-router-controller"?: string;
+                "x-root-rel"?: string;
+                summary?: string;
+                parameters?: Array<{
+                    name: string;
+                    in: string;
+                    required?: boolean;
+                }>;
+            };
+        };
+    };
 };
 
 /**
- * The logger for the API.
+ * The logger for the API address controller.
  */
-const logger = debug("api");
+const logger = debug("api:addresses");
 
 /**
- * Fetches a single address by ID.
+ * The logger for errors.
+ */
+const errorLogger = debug("error:addresses");
+
+/**
+ * Writes a standardized error response to the client.
+ * Used for consistent error handling across all address endpoints.
  *
- * @param {SwaggerRequest} request - Express request augmented with Swagger metadata.
- * @param {Response} response - Express response.
+ * @param response - Express response object.
+ * @param statusCode - HTTP status code to return.
+ * @param message - Human-readable error message.
+ * @param errorDetails - Optional error object for logging (not sent to client).
+ */
+const writeErrorResponse = (
+    response: Response,
+    statusCode: number,
+    message: string,
+    errorDetails?: unknown,
+): void => {
+    // Log the error details for debugging (not exposed to client)
+    if (errorDetails !== undefined) {
+        errorLogger(`Error [${statusCode}]: ${message}`, errorDetails);
+    }
+
+    // Set response headers and send error payload
+    response.setHeader("Content-Type", "application/json");
+    response.status(statusCode);
+    response.json({ error: message });
+};
+
+/**
+ * Fetches a single address by its unique G-NAF PID.
+ *
+ * This endpoint returns the full structured address data including
+ * building name, street details, locality, postcode, and optional
+ * geocoding information.
+ *
+ * @param request - Express request augmented with Swagger metadata.
+ * @param response - Express response.
+ *
+ * @example
+ * GET /addresses/GANSW717042159
+ *
+ * Response:
+ * {
+ *   "sla": "UNIT 1, 123 MAIN STREET, SYDNEY NSW 2000",
+ *   "structured": { ... }
+ * }
  */
 export function getAddress(request: SwaggerRequest, response: Response): void {
-    // Log the request
+    // Log the incoming request for debugging
     logger("IN getAddress");
 
-    // Get the address ID from the request
-    const addressId = request.swagger.params.addressId.value;
+    // Extract the address ID from the validated Swagger parameters
+    const addressId = request.swagger.params.addressId?.value;
 
-    // Fetch the address
+    // Guard against missing address ID (should not occur with proper Swagger validation)
+    if (addressId === undefined) {
+        writeErrorResponse(
+            response,
+            400,
+            "Missing required parameter: addressId",
+        );
+        return;
+    }
+
+    // Fetch the address from OpenSearch and handle the response
     const addressPromise = fetchAddress(addressId) as Promise<AddressResponse>;
 
-    addressPromise.then((addressResponse) => {
-        // If the address response has a status code, set the response headers and status code
-        // and write the JSON response
-        if (addressResponse.statusCode) {
-            response.setHeader("Content-Type", "application/json");
-            response.status(addressResponse.statusCode);
-            response.json(addressResponse.json);
-        } else {
-            // If the address response does not have a status code, set the response headers
-            // and write the JSON response
-            if (addressResponse.link) {
+    addressPromise
+        .then((addressResponse) => {
+            // Handle error responses from the service layer
+            if (addressResponse.statusCode !== undefined) {
+                // Set content type and return the error response
+                response.setHeader("Content-Type", "application/json");
+                response.status(addressResponse.statusCode);
+                response.json(addressResponse.json);
+                return;
+            }
+
+            // Handle success responses with HATEOAS links
+            if (addressResponse.link !== undefined) {
                 response.setHeader("link", addressResponse.link.toString());
             }
+
+            // Write the address data as JSON
             writeJson(response, addressResponse.json);
-        }
-    });
+        })
+        .catch((error: unknown) => {
+            // Handle unexpected errors from the service layer
+            writeErrorResponse(
+                response,
+                500,
+                "An unexpected error occurred while fetching the address",
+                error,
+            );
+        });
 }
 
 /**
- * Searches for addresses.
+ * Searches for addresses matching a query string with pagination support.
  *
- * @param {SwaggerRequest} request - Express request augmented with Swagger metadata.
- * @param {Response} response - Express response.
+ * This endpoint provides autocomplete/typeahead functionality for address
+ * searches. It uses fuzzy matching against the single-line address (SLA)
+ * and short single-line address (SSLA) fields.
+ *
+ * @param request - Express request augmented with Swagger metadata.
+ * @param response - Express response.
+ *
+ * @example
+ * GET /addresses?q=123%20main%20st&p=1
+ *
+ * Response:
+ * [
+ *   {
+ *     "sla": "123 MAIN STREET, SYDNEY NSW 2000",
+ *     "score": 45.2,
+ *     "links": { "self": { "href": "/addresses/GANSW717042159" } }
+ *   }
+ * ]
  */
 export function getAddresses(
     request: SwaggerRequest,
     response: Response,
 ): void {
-    // Get the query and page from the request
-    const q = request.swagger.params.q.value;
-    const p = request.swagger.params.p.value;
+    // Extract search query and page number from validated Swagger parameters
+    const q = request.swagger.params.q?.value;
+    const p = request.swagger.params.p?.value;
 
-    // Get the URL from the request
+    // Construct the base URL for HATEOAS link generation
     const url = new URL(
         request.url,
-        `http://localhost:${process.env.port || 8080}`,
+        `http://localhost:${process.env.PORT ?? "8080"}`,
     );
 
-    // Fetch the addresses
+    // Fetch matching addresses from OpenSearch
+    // Cast swagger context as the service expects the path.get structure
     const addressesPromise = fetchAddresses(
         url.pathname,
-        request.swagger,
+        request.swagger as Parameters<typeof fetchAddresses>[1],
         q,
         p,
     ) as Promise<AddressResponse>;
 
-    addressesPromise.then((addressesResponse) => {
-        // If the addresses response has a status code, set the response headers and status code
-        // and write the JSON response
-        if (addressesResponse.statusCode) {
-            response.setHeader("Content-Type", "application/json");
-            response.status(addressesResponse.statusCode);
-            response.json(addressesResponse.json);
-        } else {
-            // If the addresses response does not have a status code, set the response header
-            if (addressesResponse.link) {
+    addressesPromise
+        .then((addressesResponse) => {
+            // Handle error responses from the service layer
+            if (addressesResponse.statusCode !== undefined) {
+                response.setHeader("Content-Type", "application/json");
+                response.status(addressesResponse.statusCode);
+                response.json(addressesResponse.json);
+                return;
+            }
+
+            // Set HATEOAS Link header for pagination navigation
+            if (addressesResponse.link !== undefined) {
                 response.setHeader("link", addressesResponse.link.toString());
             }
-            if (addressesResponse.linkTemplate) {
+
+            // Set Link-Template header for API discoverability (RFC 6570)
+            if (addressesResponse.linkTemplate !== undefined) {
                 response.setHeader(
                     "link-template",
                     addressesResponse.linkTemplate.toString(),
                 );
             }
 
-            // Write the JSON response
+            // Write the search results as JSON
             writeJson(response, addressesResponse.json);
-        }
-    });
+        })
+        .catch((error: unknown) => {
+            // Handle unexpected errors from the service layer
+            writeErrorResponse(
+                response,
+                500,
+                "An unexpected error occurred while searching addresses",
+                error,
+            );
+        });
 }

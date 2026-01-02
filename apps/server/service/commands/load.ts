@@ -11,12 +11,24 @@ import * as unzip from "unzip-stream";
 import {
     COVERED_STATES,
     ES_INDEX_NAME,
+    ENABLE_GEO,
+    ES_CLEAR_INDEX,
     GNAF_DIR,
     GNAF_PACKAGE_URL,
+    INDEX_BACKOFF_INCREMENT,
+    INDEX_BACKOFF_INITIAL,
+    INDEX_BACKOFF_MAX,
+    INDEX_MAX_RETRIES,
+    INDEX_TIMEOUT,
+    LOADING_CHUNK_SIZE,
     ONE_DAY_MS,
     THIRTY_DAYS_MS,
 } from "../conf";
-import { buildSynonyms, mapAddressDetails } from "../helpers";
+import {
+    buildSynonyms,
+    clearAuthorityCodeMaps,
+    mapAddressDetails,
+} from "../helpers";
 import {
     countLinesInFile,
     fileExists,
@@ -402,16 +414,12 @@ const loadGNAFAddress = async (
 
     // Create a promise to load the GNAF address details into the index
     await new Promise<void>((resolve, reject) => {
-        // Parse the GNAF file
+        // Parse the GNAF file with configurable chunk size for memory efficiency
         Papa.parse(fs.createReadStream(file), {
             header: true,
             skipEmptyLines: true,
-            chunkSize:
-                Number.parseInt(
-                    process.env.ADDRESSKIT_LOADING_CHUNK_SIZE || "10",
-                ) *
-                1024 *
-                1024,
+            // Convert chunk size from MB to bytes
+            chunkSize: LOADING_CHUNK_SIZE * 1024 * 1024,
             chunk: (
                 chunk: Papa.ParseResult<Types.AddressDetailRow>,
                 parser: Papa.Parser,
@@ -509,38 +517,72 @@ const loadGNAFAddress = async (
 };
 
 /**
- * Sends an request to the OpenSearch database to bulk index the addresses.
+ * Custom error class for indexing failures with context about retry attempts.
+ */
+export class IndexingError extends Error {
+    /** Number of retry attempts made before giving up */
+    readonly attempts: number;
+    /** The underlying error or response that caused the failure */
+    readonly cause: unknown;
+
+    /**
+     * Creates a new IndexingError.
+     *
+     * @param message - Human-readable error description.
+     * @param attempts - Number of retry attempts made.
+     * @param cause - The underlying error or failed response.
+     */
+    constructor(message: string, attempts: number, cause: unknown) {
+        super(message);
+        this.name = "IndexingError";
+        this.attempts = attempts;
+        this.cause = cause;
+    }
+}
+
+/**
+ * Sends a bulk indexing request to OpenSearch with exponential backoff and bounded retries.
+ *
+ * This function implements a robust retry strategy for bulk indexing operations:
+ * - Exponential backoff starting from INDEX_BACKOFF_INITIAL
+ * - Linear increment added after each retry (INDEX_BACKOFF_INCREMENT)
+ * - Maximum backoff capped at INDEX_BACKOFF_MAX
+ * - Maximum retry count capped at INDEX_MAX_RETRIES (0 = unlimited, not recommended)
  *
  * @alias sendIndexRequest
  *
- * @param indexingBody - The indexing body.
- * @param initialBackoff
- * @param refresh - Whether to refresh the index.
+ * @param indexingBody - Array of index operations and documents to bulk index.
+ * @param initialBackoff - Initial backoff delay in ms (defaults to INDEX_BACKOFF_INITIAL).
+ * @param options - Additional options for the indexing request.
+ * @param options.refresh - Whether to refresh the index after indexing (default: false).
  *
- * @returns {Promise<void>} - A promise that resolves when the index request is sent.
- * @throws {Error} If the index request cannot be sent.
+ * @returns A promise that resolves when the index request succeeds.
+ * @throws {IndexingError} If all retry attempts are exhausted without success.
  */
 export const sendIndexRequest = async (
     indexingBody: Types.BulkIndexBody,
-    initialBackoff: number = Number.parseInt(
-        process.env.ADDRESSKIT_INDEX_BACKOFF || "30000",
-    ),
+    initialBackoff: number = INDEX_BACKOFF_INITIAL,
     { refresh = false }: { refresh?: boolean } = {},
 ): Promise<void> => {
-    // Initialize the backoff
+    // Initialize the backoff delay for the first retry
     let backoff = initialBackoff;
 
-    // Loop until the index request is sent
-    // biome-ignore lint/correctness/noConstantCondition: This is a loop that will run until it succeeds
-    for (let count = 0; true; count++) {
+    // Track the last error for inclusion in the final IndexingError
+    let lastError: unknown;
+
+    // Retry loop with bounded iterations (INDEX_MAX_RETRIES of 0 means unlimited)
+    const maxRetries =
+        INDEX_MAX_RETRIES > 0 ? INDEX_MAX_RETRIES : Number.MAX_SAFE_INTEGER;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            // Send the index request
+            // Send the bulk indexing request to OpenSearch
             const resp = (await (
                 global.esClient as Types.OpensearchClient
             ).bulk({
                 refresh,
                 body: indexingBody,
-                timeout: process.env.ADDRESSKIT_INDEX_TIMEOUT || "300s",
+                timeout: INDEX_TIMEOUT,
             })) as Types.OpensearchApiResponse<
                 Record<string, unknown>,
                 unknown
@@ -548,39 +590,56 @@ export const sendIndexRequest = async (
                 errors?: boolean | undefined;
             };
 
-            // If there are errors, throw the response
-            if (resp?.errors || resp.body?.errors) throw resp;
+            // Check for partial failures in the bulk response
+            // OpenSearch returns errors: true if any document failed to index
+            if (resp?.errors || resp.body?.errors) {
+                throw resp;
+            }
+
+            // Success - all documents indexed
             return;
         } catch (error_) {
-            // If there is an error, log the error and throw it
+            // Store the error for potential inclusion in IndexingError
+            lastError = error_;
+
+            // Log the error details for debugging
             error("Indexing error", JSON.stringify(error_, undefined, 2));
 
-            // Back off for the next request
-            error(`backing off for ${backoff}ms`);
-            await new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve(void 0);
-                }, backoff);
+            // Check if we've exhausted all retries
+            if (attempt >= maxRetries) {
+                error(`Maximum retries (${maxRetries}) exhausted. Giving up.`);
+                break;
+            }
+
+            // Log the backoff delay before waiting
+            error(
+                `Attempt ${attempt + 1}/${maxRetries} failed. Backing off for ${backoff}ms`,
+            );
+
+            // Wait for the backoff period before retrying
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, backoff);
             });
 
-            // Increment the backoff
-            backoff += Number.parseInt(
-                process.env.ADDRESSKIT_INDEX_BACKOFF_INCREMENT || "30000",
-            );
+            // Calculate the next backoff delay with linear increment
+            backoff += INDEX_BACKOFF_INCREMENT;
 
-            // Set the backoff to the minimum of the maximum backoff and the current backoff
-            backoff = Math.min(
-                Number.parseInt(
-                    process.env.ADDRESSKIT_INDEX_BACKOFF_MAX || "600000",
-                ),
-                backoff,
-            );
+            // Cap the backoff at the maximum configured value
+            backoff = Math.min(INDEX_BACKOFF_MAX, backoff);
 
-            // Log the next backoff
-            error(`next backoff: ${backoff}ms`);
-            error(`count: ${count}`);
+            // Log the next attempt's backoff for monitoring
+            error(
+                `Next backoff: ${backoff}ms (attempt ${attempt + 2}/${maxRetries})`,
+            );
         }
     }
+
+    // All retries exhausted - throw a descriptive error
+    throw new IndexingError(
+        `Failed to index ${indexingBody.length / 2} documents after ${maxRetries} attempts`,
+        maxRetries,
+        lastError,
+    );
 };
 
 /**
@@ -684,11 +743,7 @@ const initGNAFDataLoader = async (
     );
 
     // Initialize the OpenSearch index with synonyms and appropriate mappings
-    await initIndex(
-        global.esClient,
-        process.env.ES_CLEAR_INDEX === "true",
-        synonyms,
-    );
+    await initIndex(global.esClient, ES_CLEAR_INDEX, synonyms);
 
     // Find all ADDRESS_DETAIL files in the Standard directory for each state
     const addressDetailFiles = files.filter(
@@ -733,8 +788,8 @@ const initGNAFDataLoader = async (
                 loadContext.localityIndexed[l.LOCALITY_PID] = l;
             }
 
-            // Optionally load geocode data if ADDRESSKIT_ENABLE_GEO is set
-            if (process.env.ADDRESSKIT_ENABLE_GEO) {
+            // Optionally load geocode data if geocoding is enabled
+            if (ENABLE_GEO) {
                 // Load site geocodes (multiple geocodes per address site)
                 loadContext.geoIndexed = {};
                 await loadSiteGeo(
@@ -1245,6 +1300,10 @@ const loadAuthFiles = async (
 export const loadCommandEntry = async ({
     refresh = false,
 }: { refresh?: boolean } = {}): Promise<void> => {
+    // Clear cached authority code Maps to ensure fresh lookups
+    // This is essential when reloading data to avoid stale mappings
+    clearAuthorityCodeMaps();
+
     // Step 1: Fetch the G-NAF ZIP file (downloads if not cached or outdated)
     const file = await fetchGNAFArchive();
 

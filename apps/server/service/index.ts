@@ -7,7 +7,12 @@ import * as LinkHeader from "http-link-header";
 import * as Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import { loadCommandEntry, sendIndexRequest } from "./commands/load";
-import { ES_INDEX_NAME, PAGE_SIZE } from "./conf";
+import {
+    ES_INDEX_NAME,
+    MAX_PAGE_NUMBER,
+    MAX_PAGE_SIZE,
+    PAGE_SIZE,
+} from "./conf";
 import { clearAddresses } from "./helpers";
 import { setLinkOptions } from "./setLinkOptions";
 import type * as Types from "./types/index";
@@ -69,9 +74,9 @@ const setAddresses = async (addr: Types.IndexableAddress[]) => {
     // Create the indexing body
     const indexingBody: Types.BulkIndexBody = [];
 
-    // Loop through the addresses
+    // Loop through the addresses and build index operations
     for (const row of addr) {
-        // Add the index operation to the body
+        // Add the index operation header
         indexingBody.push({
             index: {
                 _index: ES_INDEX_NAME,
@@ -79,16 +84,18 @@ const setAddresses = async (addr: Types.IndexableAddress[]) => {
             },
         });
 
-        // Add the address details to the body
-        const { sla, ssla, ...structurted } = row;
-        const confidence =
-            structurted.structurted?.confidence ?? structurted.confidence;
+        // Destructure address components for the document body
+        const { sla, ssla, ...structured } = row;
 
-        // Add the address details to the body
+        // Extract confidence from nested structure or top-level (backwards compatible)
+        const confidence =
+            structured.structured?.confidence ?? structured.confidence;
+
+        // Add the address document body
         indexingBody.push({
             sla,
             ssla,
-            structurted,
+            structured,
             ...(confidence !== undefined && { confidence }),
         });
     }
@@ -101,43 +108,106 @@ const setAddresses = async (addr: Types.IndexableAddress[]) => {
 };
 
 /**
- * Searches for an address in the index.
+ * Validates and normalizes search pagination parameters, coercing unsafe inputs
+ * to safe defaults and clamping to avoid deep pagination.
  *
- * @augments autoCompleteAddress - This function is part of the autocomplete (searching) functionality of the service
+ * @param page - Raw page number (may be undefined, NaN, negative, or too large).
+ * @param size - Raw page size (may be undefined, NaN, negative, or too large).
+ * @returns Validated and clamped pagination parameters.
+ */
+const validatePaginationParams = (
+    page: number | undefined,
+    size: number | undefined,
+): { validPage: number; validSize: number } => {
+    // Coerce to numbers and default when inputs are not finite
+    const safePage = Number.isFinite(page) ? (page as number) : 1;
+    const safeSize = Number.isFinite(size) ? (size as number) : PAGE_SIZE;
+
+    // Ensure page is at least 1 and at most MAX_PAGE_NUMBER
+    const validPage = Math.max(1, Math.min(safePage, MAX_PAGE_NUMBER));
+
+    // Ensure size is at least 1 and at most MAX_PAGE_SIZE
+    const validSize = Math.max(1, Math.min(safeSize, MAX_PAGE_SIZE));
+
+    return { validPage, validSize };
+};
+
+/**
+ * Normalizes inbound search strings to reduce permutations and block accidental
+ * match-all queries caused by blank or whitespace-only input.
  *
- * @param searchString - The search string.
- * @param p - The page number.
- * @param pageSize - The page size.
- * @returns {Promise<Types.OpensearchApiResponse<Types.OpensearchSearchResponse<unknown>, unknown>>} - A promise that resolves when the address is searched for.
+ * @param searchString - Raw search string supplied by the caller.
+ * @returns Normalized search string (trimmed, single-spaced, or empty string).
+ */
+const normalizeSearchString = (searchString: string | undefined): string =>
+    (searchString ?? "").trim().replace(/\s+/g, " ");
+
+/**
+ * Metadata returned by searchForAddress to keep pagination and total handling
+ * consistent between the OpenSearch layer and HTTP response construction.
+ */
+type SearchForAddressResult = {
+    searchResponse: Types.OpensearchApiResponse<
+        Types.OpensearchSearchResponse<unknown>,
+        unknown
+    >;
+    page: number;
+    size: number;
+    totalHits: number;
+};
+
+/**
+ * Searches for an address in the index with fuzzy matching.
+ *
+ * This function performs a multi-match query against the SLA and SSLA fields
+ * with both bool_prefix and phrase_prefix matching for optimal autocomplete behavior.
+ *
+ * @augments autoCompleteAddress - This function is part of the autocomplete functionality
+ *
+ * @param searchString - The search string to match against addresses.
+ * @param p - The page number (1-indexed, will be validated and clamped).
+ * @param pageSize - The page size (will be validated and clamped to MAX_PAGE_SIZE).
+ * @returns A promise resolving to the OpenSearch search response with pagination metadata.
  */
 const searchForAddress = async (
     searchString: string,
-    p: number,
-    pageSize: number = PAGE_SIZE,
-): Promise<
-    Types.OpensearchApiResponse<
-        Types.OpensearchSearchResponse<unknown>,
-        unknown
-    >
-> => {
+    p: number | undefined,
+    pageSize: number | undefined = PAGE_SIZE,
+): Promise<SearchForAddressResult> => {
+    // Normalize the inbound search string to reduce query permutations
+    const normalizedSearch = normalizeSearchString(searchString);
+
+    // Reject empty searches to avoid expensive match-all queries
+    if (normalizedSearch === "") {
+        throw new Error("Search query must not be empty after normalization");
+    }
+
+    // Validate and clamp pagination parameters to prevent abuse
+    const { validPage, validSize } = validatePaginationParams(p, pageSize);
+
+    // Calculate the offset for OpenSearch (0-indexed)
+    const from = (validPage - 1) * validSize;
+
     // Search the index for the address
     const searchResp = (await (
         global.esClient as Types.OpensearchClient
     ).search({
         index: ES_INDEX_NAME,
         body: {
-            from: (p - 1 || 0) * pageSize,
-            size: pageSize,
+            from,
+            size: validSize,
+            // Limit payload to fields required by the response mapper
+            _source: ["sla"],
             query: {
                 bool: {
                     // If the search string is not empty, add the search string to the query using a multi match query to
                     // search against the `sla` and `ssla` fields
-                    ...(searchString && {
+                    ...(normalizedSearch && {
                         should: [
                             {
                                 multi_match: {
                                     fields: ["sla", "ssla"],
-                                    query: searchString,
+                                    query: normalizedSearch,
                                     // Fuzziness is set to AUTO to allow for typos and variations in the search string
                                     fuzziness: "AUTO",
                                     // Type is set to bool_prefix to allow for partial matching of the search string
@@ -152,7 +222,7 @@ const searchForAddress = async (
                             {
                                 multi_match: {
                                     fields: ["sla", "ssla"],
-                                    query: searchString,
+                                    query: normalizedSearch,
                                     // Type is set to phrase_prefix to allow for partial matching of the search string
                                     type: "phrase_prefix",
                                     // Lenient is set to true to allow for partial matching of the search string
@@ -172,21 +242,24 @@ const searchForAddress = async (
                 { "ssla.raw": { order: "asc" } },
                 { "sla.raw": { order: "asc" } },
             ],
-            highlight: {
-                fields: {
-                    sla: {},
-                    ssla: {},
-                },
-            },
         },
     })) as Types.OpensearchApiResponse<
         Types.OpensearchSearchResponse<unknown>,
         unknown
     >;
 
+    // Extract the total hit count for pagination calculations
+    const rawTotal = searchResp.body.hits.total;
+    const totalHits = typeof rawTotal === "number" ? rawTotal : rawTotal.value;
+
     // Log the hits
     logger("hits", JSON.stringify(searchResp.body.hits, undefined, 2));
-    return searchResp;
+    return {
+        searchResponse: searchResp,
+        page: validPage,
+        size: validSize,
+        totalHits: totalHits ?? 0,
+    };
 };
 
 /**
@@ -279,8 +352,22 @@ const getAddresses = async (
     p = 1,
 ): Promise<Types.GetAddressesResponse> => {
     try {
+        // Normalize inbound search to prevent match-all scans on empty input
+        const normalizedQuery = normalizeSearchString(q);
+        if (normalizedQuery === "") {
+            return {
+                statusCode: 400,
+                json: { error: "query parameter 'q' must not be empty" },
+            };
+        }
+
         // Execute the address search query against the index
-        const foundAddresses = await searchForAddress(q ?? "", p);
+        const {
+            searchResponse: foundAddresses,
+            page,
+            size,
+            totalHits,
+        } = await searchForAddress(normalizedQuery, p);
         logger("foundAddresses", foundAddresses);
 
         // Initialize the Link header for HATEOAS navigation
@@ -298,8 +385,8 @@ const getAddresses = async (
 
         // Build query string for the current request (self link)
         const sp = new URLSearchParams({
-            ...(q !== undefined && { q }),
-            ...(p !== 1 && { p: String(p) }),
+            ...(normalizedQuery !== "" && { q: normalizedQuery }),
+            ...(page !== 1 && { p: String(page) }),
         });
         const spString = sp.toString();
 
@@ -313,33 +400,28 @@ const getAddresses = async (
         link.set({
             rel: "first",
             uri: `${url}${q === undefined ? "" : "?"}${new URLSearchParams({
-                ...(q !== undefined && { q }),
+                ...(normalizedQuery !== "" && { q: normalizedQuery }),
             }).toString()}`,
         });
 
         // Add previous page link if not on the first page
-        if (p > 1) {
+        if (page > 1) {
             link.set({
                 rel: "prev",
                 uri: `${url}${
-                    q === undefined && p === 2 ? "" : "?"
+                    normalizedQuery === "" && page === 2 ? "" : "?"
                 }${new URLSearchParams({
-                    ...(q !== undefined && { q }),
-                    ...(p > 2 && { p: String(p - 1) }),
+                    ...(normalizedQuery !== "" && { q: normalizedQuery }),
+                    ...(page > 2 && { p: String(page - 1) }),
                 }).toString()}`,
             });
         }
 
-        // Extract the total hit count for pagination calculations
-        // OpenSearch returns total as either a number or a { value, relation } object
-        const rawTotal = foundAddresses.body.hits.total;
-        const totalHits =
-            typeof rawTotal === "number" ? rawTotal : rawTotal.value;
         logger("TOTAL", totalHits);
-        logger("PAGE_SIZE * p", PAGE_SIZE * p);
+        logger("PAGE_SIZE * p", size * page);
 
         // Determine if there are more pages available
-        const hasNextPage = totalHits > PAGE_SIZE * p;
+        const hasNextPage = totalHits > size * page;
         logger("next?", hasNextPage);
 
         // Add next page link if more results exist
@@ -347,8 +429,8 @@ const getAddresses = async (
             link.set({
                 rel: "next",
                 uri: `${url}?${new URLSearchParams({
-                    ...(q !== undefined && { q }),
-                    p: String(p + 1),
+                    ...(normalizedQuery !== "" && { q: normalizedQuery }),
+                    p: String(page + 1),
                 }).toString()}`,
             });
         }
