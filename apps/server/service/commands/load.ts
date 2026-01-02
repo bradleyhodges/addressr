@@ -11,9 +11,9 @@ import * as Papa from "papaparse";
 import * as unzip from "unzip-stream";
 import {
     COVERED_STATES,
-    ES_INDEX_NAME,
     ENABLE_GEO,
     ES_CLEAR_INDEX,
+    ES_INDEX_NAME,
     GNAF_DIR,
     GNAF_PACKAGE_URL,
     INDEX_BACKOFF_INCREMENT,
@@ -27,13 +27,13 @@ import {
 } from "../conf";
 import { DYNAMIC_RESOURCES_ENABLED } from "../config";
 import {
+    ResourceMonitor,
     buildSynonyms,
     clearAuthorityCodeMaps,
-    mapAddressDetails,
-    ResourceMonitor,
     getOptimalChunkSize,
-    waitForMemory,
     isMemoryPressure,
+    mapAddressDetails,
+    waitForMemory,
 } from "../helpers";
 import {
     countLinesInFile,

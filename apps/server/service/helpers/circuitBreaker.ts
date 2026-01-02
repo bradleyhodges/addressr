@@ -595,4 +595,3 @@ export const resetOpenSearchCircuit = (): void => {
         opensearchCircuit = undefined;
     }
 };
-

@@ -15,12 +15,12 @@ import {
 } from "./conf";
 import { CACHE_ENABLED } from "./config";
 import {
+    type CachedSearchResult,
+    CircuitOpenError,
     clearAddresses,
     generateSearchCacheKey,
-    getSearchCache,
     getOpenSearchCircuit,
-    CircuitOpenError,
-    type CachedSearchResult,
+    getSearchCache,
 } from "./helpers";
 import { setLinkOptions } from "./setLinkOptions";
 import type * as Types from "./types/index";

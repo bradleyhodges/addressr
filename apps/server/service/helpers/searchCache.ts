@@ -244,7 +244,9 @@ export class LRUCache<T> {
 
         // Store in cache
         this.cache.set(key, entry);
-        logger(`Cache SET: "${key.substring(0, 50)}..." (size: ${this.cache.size})`);
+        logger(
+            `Cache SET: "${key.substring(0, 50)}..." (size: ${this.cache.size})`,
+        );
     }
 
     /**
@@ -337,7 +339,9 @@ export class LRUCache<T> {
         if (firstKey !== undefined) {
             this.cache.delete(firstKey);
             this.stats.lruEvictions++;
-            logger(`Cache LRU EVICT: "${String(firstKey).substring(0, 50)}..."`);
+            logger(
+                `Cache LRU EVICT: "${String(firstKey).substring(0, 50)}..."`,
+            );
         }
     }
 
@@ -473,4 +477,3 @@ export const resetSearchCache = (): void => {
         searchCacheInstance = undefined;
     }
 };
-
