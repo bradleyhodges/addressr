@@ -169,8 +169,6 @@ const searchForAddress = async (searchString, p, pageSize = conf_1.PAGE_SIZE) =>
     const from = (validPage - 1) * validSize;
     // Execute search with circuit breaker protection
     const circuit = (0, helpers_1.getOpenSearchCircuit)();
-    // Calculate the query length for proximity scoring
-    const queryLength = normalizedSearch.length;
     const searchResp = await circuit.execute(async () => {
         // Search the index for the address
         return (await global.esClient.search({
@@ -181,73 +179,55 @@ const searchForAddress = async (searchString, p, pageSize = conf_1.PAGE_SIZE) =>
                 // Limit payload to fields required by the response mapper
                 _source: ["sla"],
                 query: {
-                    // Use function_score to boost addresses that are closer in length to the query.
-                    // This ensures "50 St Georges Tce" ranks above "Shop 5, 50 St Georges Tce"
-                    // when searching for "50 St Georges Tce"
-                    function_score: {
-                        query: {
-                            bool: {
-                                // If the search string is not empty, add the search string to the query using a multi match query to
-                                // search against the `sla` and `ssla` fields
-                                ...(normalizedSearch && {
-                                    should: [
-                                        {
-                                            multi_match: {
-                                                fields: ["sla", "ssla"],
-                                                query: normalizedSearch,
-                                                // Fuzziness is set to AUTO to allow for typos and variations in the search string
-                                                fuzziness: "AUTO",
-                                                // Type is set to bool_prefix to allow for partial matching of the search string
-                                                type: "bool_prefix",
-                                                // Lenient is set to true to allow for partial matching of the search string
-                                                lenient: true,
-                                                // Auto generate synonyms phrase query is set to false to prevent the generation of synonyms phrase queries
-                                                auto_generate_synonyms_phrase_query: false,
-                                                operator: "AND",
-                                            },
+                    bool: {
+                        // If the search string is not empty, add the search string to the query using a multi match query to
+                        // search against the `sla` and `ssla` fields
+                        ...(normalizedSearch && {
+                            should: [
+                                // Highest boost: Address starts with the search query (exact prefix match)
+                                // This ensures "50 ST GEORGES TCE" ranks above "UNIT 1, 50 ST GEORGES TCE"
+                                {
+                                    prefix: {
+                                        "sla.raw": {
+                                            value: normalizedSearch.toUpperCase(),
+                                            boost: 100,
                                         },
-                                        {
-                                            multi_match: {
-                                                fields: ["sla", "ssla"],
-                                                query: normalizedSearch,
-                                                // Type is set to phrase_prefix to allow for partial matching of the search string
-                                                type: "phrase_prefix",
-                                                // Lenient is set to true to allow for partial matching of the search string
-                                                lenient: true,
-                                                // Auto generate synonyms phrase query is set to false to prevent the generation of synonyms phrase queries
-                                                auto_generate_synonyms_phrase_query: false,
-                                                operator: "AND",
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                        // Script score to boost addresses with length closer to the query length.
-                        // Uses a decay function: the more "extra" characters an address has beyond
-                        // the query, the lower the boost. This prioritizes exact-length matches
-                        // while still allowing longer addresses to appear in results.
-                        script_score: {
-                            script: {
-                                source: `
-                                    // Get the SLA field length, defaulting to a large value if missing
-                                    int slaLen = doc['sla.raw'].size() > 0 ? doc['sla.raw'].value.length() : 1000;
-                                    // Calculate how much longer the address is compared to the query
-                                    int extraChars = Math.max(0, slaLen - params.queryLen);
-                                    // Apply a decay factor: addresses with more extra characters get lower scores
-                                    // The decay is moderate (0.02 per extra char) to not completely override relevance
-                                    // but strong enough to prioritize shorter, closer matches
-                                    double proximityBoost = 1.0 / (1.0 + extraChars * 0.02);
-                                    // Multiply the original score by the proximity boost
-                                    return _score * proximityBoost;
-                                `,
-                                params: {
-                                    queryLen: queryLength,
+                                    },
                                 },
-                            },
-                        },
-                        // Ensure we use the modified score from the script
-                        boost_mode: "replace",
+                                // High boost: Short single-line address starts with search query
+                                {
+                                    prefix: {
+                                        "ssla.raw": {
+                                            value: normalizedSearch.toUpperCase(),
+                                            boost: 80,
+                                        },
+                                    },
+                                },
+                                // Medium boost: Phrase prefix match (sequential term matching)
+                                {
+                                    multi_match: {
+                                        fields: ["sla^2", "ssla"],
+                                        query: normalizedSearch,
+                                        type: "phrase_prefix",
+                                        lenient: true,
+                                        auto_generate_synonyms_phrase_query: false,
+                                        boost: 10,
+                                    },
+                                },
+                                // Lower boost: Fuzzy bool_prefix for typo tolerance
+                                {
+                                    multi_match: {
+                                        fields: ["sla", "ssla"],
+                                        query: normalizedSearch,
+                                        fuzziness: "AUTO",
+                                        type: "bool_prefix",
+                                        lenient: true,
+                                        auto_generate_synonyms_phrase_query: false,
+                                        operator: "AND",
+                                    },
+                                },
+                            ],
+                        }),
                     },
                 },
                 sort: [

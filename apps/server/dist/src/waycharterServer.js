@@ -3,11 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.startRest2Server = startRest2Server;
 exports.stopServer = stopServer;
 const node_crypto_1 = require("node:crypto");
+const node_fs_1 = require("node:fs");
 const node_http_1 = require("node:http");
+const path = require("node:path");
 const waycharter_1 = require("@mountainpass/waycharter");
 const version_1 = require("@repo/addresskit-core/version");
 const debug_1 = require("debug");
 const express = require("express");
+const js_yaml_1 = require("js-yaml");
+const swaggerUi = require("swagger-ui-express");
 const service_1 = require("../service");
 const config_1 = require("../service/config");
 const app = express();
@@ -52,13 +56,15 @@ function appendCorsHeaders(_request, response, next) {
  * @returns {AddressCollectionBody} Normalized address payload for clients.
  */
 function mapSearchHitToAddress(hit) {
-    // Use the first highlight snippet for each field to keep payloads small
+    // Use the first highlight snippet for each field if available, otherwise fall back to source
+    const highlightSla = hit.highlight?.sla?.[0] ?? hit._source.sla;
+    const highlightSsla = hit.highlight?.ssla?.[0] ?? hit._source.ssla;
     return {
         sla: hit._source.sla,
         ...(hit._source.ssla && { ssla: hit._source.ssla }),
         highlight: {
-            sla: hit.highlight.sla[0],
-            ...(hit.highlight.ssla && { ssla: hit.highlight.ssla[0] }),
+            sla: highlightSla,
+            ...(highlightSsla && { ssla: highlightSsla }),
         },
         score: hit._score,
         pid: hit._id.replace("/addresses/", ""),
@@ -95,7 +101,8 @@ async function loadAddressItem({ pid }) {
  * @returns {Promise<{ body: AddressCollectionBody[]; hasMore: boolean; headers: Record<string, string>; }>} Collection response with cache headers.
  * @throws {Error} When the provided page value cannot be parsed as a number.
  */
-async function loadAddressCollection({ page, q, }) {
+async function loadAddressCollection(params) {
+    const { page, q } = params;
     // Accept numeric strings from query params while rejecting non-numeric input.
     const resolvedPage = Number(page ?? 0);
     if (!Number.isFinite(resolvedPage)) {
@@ -103,10 +110,15 @@ async function loadAddressCollection({ page, q, }) {
     }
     // If the query is defined and longer than 2 characters, search for addresses.
     if (q && q.length > 2) {
+        logger("Searching for addresses with query:", q);
         // Query length guard prevents expensive searches on very short strings.
-        const foundAddresses = (await (0, service_1.searchForAddress)(q, resolvedPage + 1, pageSize));
+        const searchResult = (await (0, service_1.searchForAddress)(q, resolvedPage + 1, pageSize));
+        logger("Search result totalHits:", searchResult.totalHits);
+        logger("Search response structure:", JSON.stringify(Object.keys(searchResult)));
+        // Extract hits from the nested searchResponse structure
+        const hits = searchResult.searchResponse.body.hits.hits;
         // Map the search hits to the address collection body.
-        const body = foundAddresses.body.hits.hits.map(mapSearchHitToAddress);
+        const body = hits.map(mapSearchHitToAddress);
         // Create a hash of the body to use as the ETag.
         const responseHash = (0, node_crypto_1.createHash)("md5")
             .update(JSON.stringify(body))
@@ -114,8 +126,7 @@ async function loadAddressCollection({ page, q, }) {
         // Return the address collection body, hasMore, and headers.
         return {
             body,
-            hasMore: resolvedPage <
-                foundAddresses.body.hits.total.value / pageSize - 1,
+            hasMore: resolvedPage < searchResult.totalHits / pageSize - 1,
             headers: {
                 etag: `"${version_1.version}-${responseHash}"`,
                 "cache-control": `public, max-age=${ONE_WEEK}`,
@@ -141,6 +152,15 @@ async function loadAddressCollection({ page, q, }) {
 async function startRest2Server() {
     // Use the CORS middleware
     app.use(appendCorsHeaders);
+    // Load and serve OpenAPI/Swagger documentation at /docs
+    const swaggerSpecPath = path.join(__dirname, "../api/swagger.yaml");
+    const swaggerSpec = (0, js_yaml_1.load)((0, node_fs_1.readFileSync)(swaggerSpecPath, "utf8"));
+    // Cast through unknown to resolve express type version conflicts
+    app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    // Serve the raw OpenAPI spec as JSON at /api-docs
+    app.get("/api-docs", (_req, res) => {
+        res.json(swaggerSpec);
+    });
     // WayCharter provides hypermedia routing; attach its router before custom handlers.
     // Create a new WayCharter instance
     const waycharter = new waycharter_1.WayCharter();
@@ -151,12 +171,12 @@ async function startRest2Server() {
         itemLoader: loadAddressItem,
         collectionPath: "/addresses",
         collectionLoader: loadAddressCollection,
-        // filters: [
-        //     {
-        //         rel: "https://addressr.io/rels/address-search",
-        //         parameters: ["q"],
-        //     },
-        // ],
+        filters: [
+            {
+                rel: "https://addressr.io/rels/address-search",
+                parameters: ["q"],
+            },
+        ],
     });
     /**
      * Builds the API index resource, exposing links to available collections.
