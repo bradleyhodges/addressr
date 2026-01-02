@@ -8,6 +8,7 @@
 import { esConnect } from "@repo/addresskit-client/elasticsearch";
 import debug from "debug";
 import service from "../../service";
+import { VERBOSE } from "../../service/config";
 import {
     displayBox,
     displayKeyValue,
@@ -21,7 +22,6 @@ import {
     startSpinner,
     succeedSpinner,
 } from "../../service/helpers/terminalUI";
-import { VERBOSE } from "../../service/config";
 
 /** Debug logger for API operations */
 const logger = debug("api");

@@ -63,6 +63,7 @@
         "ignore": [
             "**/node_modules",
             "**/dist",
+            "**/dist/*",
             "**/build",
             "**/.next",
             "**/.basehub",

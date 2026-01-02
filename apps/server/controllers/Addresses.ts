@@ -5,8 +5,8 @@ import {
     getAddress as fetchAddress,
     getAddresses as fetchAddresses,
 } from "../service";
-import { JSONAPI_CONTENT_TYPE } from "../service/helpers/jsonapi";
 import { VERBOSE } from "../service/config";
+import { JSONAPI_CONTENT_TYPE } from "../service/helpers/jsonapi";
 
 /**
  * Structured response from address service functions.

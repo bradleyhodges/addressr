@@ -30,8 +30,10 @@ import {
     ResourceMonitor,
     buildSynonyms,
     clearAuthorityCodeMaps,
+    createProgressBar,
     failSpinner,
     formatBytes,
+    formatDuration,
     formatNumber,
     formatState,
     getDaemonMode,
@@ -42,6 +44,7 @@ import {
     mapAddressDetails,
     startSpinner,
     succeedSpinner,
+    theme,
     updateSpinner,
     waitForMemory,
 } from "../helpers";
@@ -208,12 +211,45 @@ const fetchGNAFArchive = async (): Promise<string> => {
     } catch {
         // The destination file does not exist, so we need to download it.
         if (VERBOSE) logger("Starting G-NAF download");
+
+        // Start a spinner for the download
+        const downloadSpinner = startSpinner("Downloading G-NAF data file...");
+        const downloadStartTime = Date.now();
+
         try {
-            // Download the GNAF file
+            // Download the GNAF file with progress callback
             await download(
                 dataResource.url,
                 `${incomplete_path}/${basename}`,
                 dataResource.size,
+                (progress) => {
+                    // Build progress display with the terminalUI progress bar
+                    const progressBar = createProgressBar(
+                        progress.bytesDownloaded,
+                        progress.totalBytes,
+                        25,
+                    );
+
+                    // Format speed and ETA
+                    const speed = formatBytes(progress.bytesPerSecond);
+                    const downloaded = formatBytes(progress.bytesDownloaded);
+                    const total = formatBytes(progress.totalBytes);
+                    const eta =
+                        progress.etaSeconds > 0
+                            ? formatDuration(progress.etaSeconds * 1000)
+                            : "calculating...";
+
+                    // Update spinner text with beautiful progress info
+                    updateSpinner(
+                        `Downloading G-NAF  ${progressBar}  ${theme.muted(`${downloaded} / ${total}`)}  ${theme.secondary(`${speed}/s`)}  ${theme.dim(`ETA: ${eta}`)}`,
+                    );
+                },
+            );
+
+            // Calculate download duration
+            const downloadDuration = Date.now() - downloadStartTime;
+            succeedSpinner(
+                `Downloaded G-NAF data file (${formatBytes(dataResource.size)} in ${formatDuration(downloadDuration)})`,
             );
 
             // Rename the GNAF file
@@ -223,6 +259,9 @@ const fetchGNAFArchive = async (): Promise<string> => {
             // Return the destination path
             return destination;
         } catch (error_) {
+            // Fail the spinner
+            failSpinner("Failed to download G-NAF data file");
+
             // Log the error
             error("Error downloading G-NAF", error_);
 

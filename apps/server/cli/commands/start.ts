@@ -7,6 +7,7 @@
 
 import { esConnect } from "@repo/addresskit-client/elasticsearch";
 import debug from "debug";
+import { VERBOSE } from "../../service/config";
 import {
     displayBox,
     displayKeyValue,
@@ -21,7 +22,6 @@ import {
     theme,
 } from "../../service/helpers/terminalUI";
 import { startRest2Server } from "../../src/waycharterServer";
-import { VERBOSE } from "../../service/config";
 
 /** Debug logger for API operations */
 const logger = debug("api");
