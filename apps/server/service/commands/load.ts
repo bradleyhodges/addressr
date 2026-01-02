@@ -8,23 +8,23 @@ import * as glob from "glob-promise";
 import * as got from "got";
 import * as Papa from "papaparse";
 import * as unzip from "unzip-stream";
-import { mapAddressDetails, buildSynonyms } from "../helpers";
-import type * as Types from "../types/index";
-import {
-    getFiles,
-    countLinesInFile,
-    fileExists,
-    loadFileCounts,
-} from "../helpers/fs";
 import {
     COVERED_STATES,
+    ES_INDEX_NAME,
+    GNAF_DIR,
+    GNAF_PACKAGE_URL,
     ONE_DAY_MS,
     THIRTY_DAYS_MS,
-    ES_INDEX_NAME,
-    GNAF_PACKAGE_URL,
-    GNAF_DIR,
 } from "../conf";
-import { logger, error, cache, gotClient, fsp } from "../index";
+import { buildSynonyms, mapAddressDetails } from "../helpers";
+import {
+    countLinesInFile,
+    fileExists,
+    getFiles,
+    loadFileCounts,
+} from "../helpers/fs";
+import { cache, error, fsp, gotClient, logger } from "../index";
+import type * as Types from "../types/index";
 
 /**
  * Fetches the GNAF package data from the cache (if fresh enough content exists) or from the network.

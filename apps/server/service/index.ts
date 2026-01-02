@@ -7,7 +7,7 @@ import * as LinkHeader from "http-link-header";
 import * as Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import { loadCommandEntry, sendIndexRequest } from "./commands/load";
-import { PAGE_SIZE, ES_INDEX_NAME } from "./conf";
+import { ES_INDEX_NAME, PAGE_SIZE } from "./conf";
 import { clearAddresses } from "./helpers";
 import { setLinkOptions } from "./setLinkOptions";
 import type * as Types from "./types/index";

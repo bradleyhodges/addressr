@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as Papa from "papaparse";
-import { logger, error, fsp, readdir } from "../index";
+import { error, fsp, logger, readdir } from "../index";
 
 /**
  * Gets the files from the given directory.

@@ -1,5 +1,5 @@
-import { initIndex } from "@repo/addressr-client/elasticsearch";
 import { type Client } from "@opensearch-project/opensearch";
+import { initIndex } from "@repo/addressr-client/elasticsearch";
 
 /**
  * Clears the addresses index.

@@ -1,33 +1,33 @@
+import { logger } from "../index";
 import {
-    levelTypeCodeToName,
+    AddressDetailRow,
+    AddressDetails,
+    AddressGeocode,
+    FlatDetails,
+    GeoDefaultRecord,
+    GeoSiteRecord,
+    LevelDetails,
+    LocalityRecord,
+    LotNumber,
+    MapPropertyContext,
+    NumberRange,
+    StreetLocalityRecord,
+    StructuredAddress,
+    StructuredLocality,
+    StructuredStreetLocality,
+} from "../types/gnaf-properties";
+import {
+    type PropertyCodeToNameContext,
     flatTypeCodeToName,
-    streetTypeCodeToName,
-    streetClassCodeToName,
-    localityClassCodeToName,
-    streetSuffixCodeToName,
     geocodeReliabilityCodeToName,
     geocodeTypeCodeToName,
     levelGeocodedCodeToName,
-    type PropertyCodeToNameContext,
+    levelTypeCodeToName,
+    localityClassCodeToName,
+    streetClassCodeToName,
+    streetSuffixCodeToName,
+    streetTypeCodeToName,
 } from "./propertyCodeToName";
-import { logger } from "../index";
-import {
-    LocalityRecord,
-    StructuredLocality,
-    StreetLocalityRecord,
-    StructuredStreetLocality,
-    GeoSiteRecord,
-    GeoDefaultRecord,
-    AddressGeocode,
-    StructuredAddress,
-    AddressDetailRow,
-    LevelDetails,
-    FlatDetails,
-    LotNumber,
-    NumberRange,
-    MapPropertyContext,
-    AddressDetails,
-} from "../types/gnaf-properties";
 
 /**
  * Maps a locality object to a structured locality object.
