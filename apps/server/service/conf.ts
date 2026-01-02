@@ -28,7 +28,7 @@ export const THIRTY_DAYS_MS = ONE_DAY_MS * 30;
 /**
  * The name of the Elasticsearch index.
  */
-export const ES_INDEX_NAME = process.env.ES_INDEX_NAME || "addressr";
+export const ES_INDEX_NAME = process.env.ES_INDEX_NAME || "addresskit";
 
 /**
  * The URL of the Geoscape Geocoded National Address File (G-NAF) package.

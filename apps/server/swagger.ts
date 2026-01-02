@@ -169,26 +169,28 @@ export function startServer(): Promise<string> {
     // Use the CORS middleware
     app.use((request, response, next) => {
         // If the ACCESS_CONTROL_ALLOW_ORIGIN environment variable is set, add the Access-Control-Allow-Origin header
-        if (process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_ORIGIN !== undefined) {
+        if (process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_ORIGIN !== undefined) {
             response.append(
                 "Access-Control-Allow-Origin",
-                process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_ORIGIN,
+                process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_ORIGIN,
             );
         }
 
         // If the ACCESS_CONTROL_EXPOSE_HEADERS environment variable is set, add the Access-Control-Expose-Headers header
-        if (process.env.ADDRESSR_ACCESS_CONTROL_EXPOSE_HEADERS !== undefined) {
+        if (
+            process.env.ADDRESSKIT_ACCESS_CONTROL_EXPOSE_HEADERS !== undefined
+        ) {
             response.append(
                 "Access-Control-Expose-Headers",
-                process.env.ADDRESSR_ACCESS_CONTROL_EXPOSE_HEADERS,
+                process.env.ADDRESSKIT_ACCESS_CONTROL_EXPOSE_HEADERS,
             );
         }
 
         // If the ACCESS_CONTROL_ALLOW_HEADERS environment variable is set, add the Access-Control-Allow-Headers header
-        if (process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_HEADERS !== undefined) {
+        if (process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_HEADERS !== undefined) {
             response.append(
                 "Access-Control-Allow-Headers",
-                process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_HEADERS,
+                process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_HEADERS,
             );
         }
 
@@ -205,7 +207,7 @@ export function startServer(): Promise<string> {
         server.listen(serverPort, () => {
             // Log the server listening
             logger(
-                "📡  Addressr is listening on port %d ( http://localhost:%d ) ",
+                "📡  AddressKit is listening on port %d ( http://localhost:%d ) ",
                 serverPort,
                 serverPort,
             );

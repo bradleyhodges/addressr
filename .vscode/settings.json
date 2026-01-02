@@ -27,7 +27,7 @@
     "cucumberautocomplete.skipDocStringsFormat": true,
     "cucumberautocomplete.syncfeatures": "src/test/**/*.feature",
     "linter_codeclimate.enabled": true,
-    "cSpell.words": ["ADDRESSR", "mountainpass", "waycharter", "waychaser"],
+    "cSpell.words": ["AddressKit", "waycharter", "waychaser"],
     "typescript.tsdk": "node_modules/typescript/lib",
     "files.exclude": {
         "**/.git": true,

@@ -1,4 +1,4 @@
-import { version } from "@repo/addressr-core/version";
+import { version } from "@repo/addresskit-core/version";
 import * as dotenv from "dotenv";
 
 /**

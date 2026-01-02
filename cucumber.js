@@ -7,7 +7,7 @@ function generateConfig(profile) {
     fs.mkdirSync(`test-results/${profile}`, { recursive: true });
 
     const RERUN = `@cucumber-${profile}.rerun`;
-    let TAGS = process.env.ADDRESSR_ENABLE_GEO
+    let TAGS = process.env.ADDRESSKIT_ENABLE_GEO
         ? `--tags 'not(@not-${profile}) and not(@not-geo)`
         : `--tags 'not(@not-${profile}) and not(@geo)`;
     if (profile === "rest2") {

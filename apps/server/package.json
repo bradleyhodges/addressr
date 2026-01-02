@@ -1,5 +1,5 @@
 {
-    "name": "@repo/addressr-server",
+    "name": "@repo/addresskit-server",
     "private": true,
     "type": "commonjs",
     "main": "server.ts",
@@ -12,8 +12,8 @@
     },
     "dependencies": {
         "@mountainpass/waycharter": "^1.0.76",
-        "@repo/addressr-client": "workspace:*",
-        "@repo/addressr-core": "workspace:*",
+        "@repo/addresskit-client": "workspace:*",
+        "@repo/addresskit-core": "workspace:*",
         "debug": "^4.4.3",
         "directory-exists": "^2.0.1",
         "dotenv": "^10.0.0",

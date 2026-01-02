@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Cross-platform smoke test for Addressr.
+ * Cross-platform smoke test for AddressKit.
  *
  * - Verifies OpenSearch reachable
  * - Optionally seeds a fixture index (fast local testing)
@@ -15,7 +15,7 @@
  *   ELASTIC_PORT=9200
  *   API_URL=http://localhost:8080
  *   SEED_FIXTURES=1
- *   INDEX_NAME=addressr_smoke
+ *   INDEX_NAME=addresskit_smoke
  */
 
 const DEFAULTS = {
@@ -24,7 +24,7 @@ const DEFAULTS = {
     ELASTIC_PORT: Number(process.env.ELASTIC_PORT || 9200),
     API_URL: process.env.API_URL || "http://localhost:8080",
     SEED_FIXTURES: process.env.SEED_FIXTURES === "1",
-    INDEX_NAME: process.env.INDEX_NAME || "addressr_smoke",
+    INDEX_NAME: process.env.INDEX_NAME || "addresskit_smoke",
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

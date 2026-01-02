@@ -3,10 +3,10 @@ description: General Rules for this Project
 globs: 
 alwaysApply: true
 ---
-# @bradleyhodges/addressr
+# @bradleyhodges/addresskit
 
 ## PROJECT DESCRIPTION
-- This project is designed to provide a open-source, scalable address validation, search, and autocomplete system that handles complex address structures, real-time updates, and predictive analytics for address validation of Australian addresses against the Geocoded National Address File (referred to as G-NAF), Australia's authoritative address file. This is a fork of the original project, @mountainpass/addressr. This fork's objective are to:
+- This project is designed to provide a open-source, scalable address validation, search, and autocomplete system that handles complex address structures, real-time updates, and predictive analytics for address validation of Australian addresses against the Geocoded National Address File (referred to as G-NAF), Australia's authoritative address file. This is a fork of the original project, @@bradleyhodges/addresskit. This fork's objective are to:
 
   - Improve the quality, performance, and maintainability of the codebase
   - Convert the javascript codebase to typescript for type safety and better readability

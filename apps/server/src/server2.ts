@@ -1,4 +1,4 @@
-import { esConnect } from "@repo/addressr-client/elasticsearch";
+import { esConnect } from "@repo/addresskit-client/elasticsearch";
 import debug from "debug";
 import { printVersion } from "../service/printVersion";
 import { startRest2Server } from "./waycharterServer";
@@ -42,7 +42,7 @@ async function bootstrapServer(): Promise<void> {
 
     // Print the version and environment
     console.log("=======================");
-    console.log("Addressr - API Server 2");
+    console.log("AddressKit - API Server 2");
     console.log("=======================");
     printVersion();
 }

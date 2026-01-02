@@ -31,7 +31,7 @@ const error = debug("error");
 /**
  * The name of the Elasticsearch index.
  */
-const ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addressr";
+const ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addresskit";
 
 /**
  * Configuration values for the Elasticsearch server

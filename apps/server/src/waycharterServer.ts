@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { type Server, createServer } from "node:http";
 import { WayCharter } from "@mountainpass/waycharter";
-import { version } from "@repo/addressr-core/version";
+import { version } from "@repo/addresskit-core/version";
 import debug from "debug";
 import * as express from "express";
 import type { NextFunction, Request, Response } from "express";
@@ -106,26 +106,26 @@ function appendCorsHeaders(
     next: NextFunction,
 ): void {
     // If the ACCESS_CONTROL_ALLOW_ORIGIN environment variable is set, add the Access-Control-Allow-Origin header
-    if (process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_ORIGIN !== undefined) {
+    if (process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_ORIGIN !== undefined) {
         response.append(
             "Access-Control-Allow-Origin",
-            process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_ORIGIN,
+            process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_ORIGIN,
         );
     }
 
     // If the ACCESS_CONTROL_EXPOSE_HEADERS environment variable is set, add the Access-Control-Expose-Headers header
-    if (process.env.ADDRESSR_ACCESS_CONTROL_EXPOSE_HEADERS !== undefined) {
+    if (process.env.ADDRESSKIT_ACCESS_CONTROL_EXPOSE_HEADERS !== undefined) {
         response.append(
             "Access-Control-Expose-Headers",
-            process.env.ADDRESSR_ACCESS_CONTROL_EXPOSE_HEADERS,
+            process.env.ADDRESSKIT_ACCESS_CONTROL_EXPOSE_HEADERS,
         );
     }
 
     // If the ACCESS_CONTROL_ALLOW_HEADERS environment variable is set, add the Access-Control-Allow-Headers header
-    if (process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_HEADERS !== undefined) {
+    if (process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_HEADERS !== undefined) {
         response.append(
             "Access-Control-Allow-Headers",
-            process.env.ADDRESSR_ACCESS_CONTROL_ALLOW_HEADERS,
+            process.env.ADDRESSKIT_ACCESS_CONTROL_ALLOW_HEADERS,
         );
     }
 
@@ -269,12 +269,12 @@ export async function startRest2Server(): Promise<string> {
         itemLoader: loadAddressItem,
         collectionPath: "/addresses",
         collectionLoader: loadAddressCollection,
-        filters: [
-            {
-                rel: "https://addressr.io/rels/address-search",
-                parameters: ["q"],
-            },
-        ],
+        // filters: [
+        //     {
+        //         rel: "https://addressr.io/rels/address-search",
+        //         parameters: ["q"],
+        //     },
+        // ],
     });
 
     /**
@@ -313,7 +313,7 @@ export async function startRest2Server(): Promise<string> {
      */
     const logStartup = (): void => {
         logger(
-            "📡  Addressr is listening on port %d ( http://localhost:%d ) ",
+            "📡  AddressKit is listening on port %d ( http://localhost:%d ) ",
             serverPort,
             serverPort,
         );

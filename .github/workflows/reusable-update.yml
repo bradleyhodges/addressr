@@ -33,7 +33,7 @@ jobs:
           ELASTIC_PORT: 443
           ELASTIC_PROTOCOL: https
           NODE_ENV: production
-          ADDRESSR_ENABLE_GEO: 1
+          ADDRESSKIT_ENABLE_GEO: 1
           DEBUG: error,api,express:*,swagger-tools*,test,es
         run: |
           set -x
@@ -41,5 +41,5 @@ jobs:
           chmod +x ./install.sh
           ./install.sh
           env | grep -E '^(ELASTIC)_'
-          COVERED_STATES=${{ inputs.state }} NODE_OPTIONS=--max_old_space_size=8196 addressr-loader
+          COVERED_STATES=${{ inputs.state }} NODE_OPTIONS=--max_old_space_size=8196 addresskit-loader
           set +x

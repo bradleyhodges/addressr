@@ -1,4 +1,4 @@
-import { writeJson } from "@repo/addressr-core";
+import { writeJson } from "@repo/addresskit-core";
 import debug from "debug";
 import type { Request, Response } from "express";
 import {

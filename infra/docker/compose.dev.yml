@@ -7,7 +7,7 @@ services:
       # Dev heap sizing; tune up/down depending on your box.
       - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
       # Avoids OpenSearch complaining about running as single node with certain defaults
-      - cluster.name=addressr-dev
+      - cluster.name=addresskit-dev
       - node.name=opensearch-1
     ports:
       - "9200:9200"

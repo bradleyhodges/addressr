@@ -3,7 +3,7 @@ info:
   description: |
     Free Australian Address Validation, Search and Autocomplete
   version: '1.0.0'
-  title: 'Addressr by Mountain Pass'
+  title: 'AddressKit'
 basePath: '/'
 tags:
   - name: address
@@ -53,7 +53,6 @@ paths:
       summary: Get List of Addresses
       operationId: getAddresses
       x-swagger-router-controller: Addresses
-      x-root-rel: https://addressr.mountain-pass.com.au/rels/address-search
       description: |
         returns a list of addresses matching the search string
       tags:

@@ -1,4 +1,4 @@
-import { esConnect } from "@repo/addressr-client/elasticsearch";
+import { esConnect } from "@repo/addresskit-client/elasticsearch";
 import debug from "debug";
 import service from "./service";
 import { printVersion } from "./service/printVersion";
@@ -33,7 +33,7 @@ async function runLoader(): Promise<void> {
 
     // Print the version and environment
     console.log("======================");
-    console.log("Addressr - Data Loader");
+    console.log("AddressKit - Data Loader");
     console.log("=======================");
     printVersion();
 

@@ -65,7 +65,7 @@ jobs:
             npm run deploy:prod
           env: |
             TF_IN_AUTOMATION=1
-            TF_VAR_elasticapp=mountainpass-addressr
+            TF_VAR_elasticapp=addresskit
             TF_VAR_elastic_host
             TF_VAR_elastic_password
             TF_VAR_elastic_username

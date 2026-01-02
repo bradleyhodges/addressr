@@ -3,7 +3,7 @@ info:
   description: |
     Australian Address Validation, Search and Autocomplete
   version: '1.0.0'
-  title: 'Addressr by Mountain Pass'
+  title: 'AddressKit'
 basePath: '/'
 tags:
   - name: address

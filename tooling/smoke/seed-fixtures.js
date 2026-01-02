@@ -13,7 +13,7 @@
  *   ELASTIC_PROTOCOL=http
  *   ELASTIC_HOST=localhost
  *   ELASTIC_PORT=9200
- *   INDEX_NAME=addressr_smoke
+ *   INDEX_NAME=addresskit_smoke
  *   RESET_INDEX=1                 # delete & recreate index (recommended)
  *   WAIT_FOR_OS=1                 # wait for OpenSearch readiness (default: 1)
  */
@@ -22,7 +22,7 @@ const cfg = {
     protocol: process.env.ELASTIC_PROTOCOL || "http",
     host: process.env.ELASTIC_HOST || "localhost",
     port: Number(process.env.ELASTIC_PORT || 9200),
-    index: process.env.INDEX_NAME || "addressr_smoke",
+    index: process.env.INDEX_NAME || "addresskit_smoke",
     reset: process.env.RESET_INDEX === "1",
     wait: process.env.WAIT_FOR_OS !== "0",
 };

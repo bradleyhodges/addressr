@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as stream from "node:stream";
-import { initIndex } from "@repo/addressr-client/elasticsearch";
-import download from "@repo/addressr-core/utils/stream-down";
+import { initIndex } from "@repo/addresskit-client/elasticsearch";
+import download from "@repo/addresskit-core/utils/stream-down";
 import * as directoryExists from "directory-exists";
 import * as glob from "glob-promise";
 import * as got from "got";
@@ -408,7 +408,7 @@ const loadGNAFAddress = async (
             skipEmptyLines: true,
             chunkSize:
                 Number.parseInt(
-                    process.env.ADDRESSR_LOADING_CHUNK_SIZE || "10",
+                    process.env.ADDRESSKIT_LOADING_CHUNK_SIZE || "10",
                 ) *
                 1024 *
                 1024,
@@ -523,7 +523,7 @@ const loadGNAFAddress = async (
 export const sendIndexRequest = async (
     indexingBody: Types.BulkIndexBody,
     initialBackoff: number = Number.parseInt(
-        process.env.ADDRESSR_INDEX_BACKOFF || "30000",
+        process.env.ADDRESSKIT_INDEX_BACKOFF || "30000",
     ),
     { refresh = false }: { refresh?: boolean } = {},
 ): Promise<void> => {
@@ -540,7 +540,7 @@ export const sendIndexRequest = async (
             ).bulk({
                 refresh,
                 body: indexingBody,
-                timeout: process.env.ADDRESSR_INDEX_TIMEOUT || "300s",
+                timeout: process.env.ADDRESSKIT_INDEX_TIMEOUT || "300s",
             })) as Types.OpensearchApiResponse<
                 Record<string, unknown>,
                 unknown
@@ -565,13 +565,13 @@ export const sendIndexRequest = async (
 
             // Increment the backoff
             backoff += Number.parseInt(
-                process.env.ADDRESSR_INDEX_BACKOFF_INCREMENT || "30000",
+                process.env.ADDRESSKIT_INDEX_BACKOFF_INCREMENT || "30000",
             );
 
             // Set the backoff to the minimum of the maximum backoff and the current backoff
             backoff = Math.min(
                 Number.parseInt(
-                    process.env.ADDRESSR_INDEX_BACKOFF_MAX || "600000",
+                    process.env.ADDRESSKIT_INDEX_BACKOFF_MAX || "600000",
                 ),
                 backoff,
             );
@@ -733,8 +733,8 @@ const initGNAFDataLoader = async (
                 loadContext.localityIndexed[l.LOCALITY_PID] = l;
             }
 
-            // Optionally load geocode data if ADDRESSR_ENABLE_GEO is set
-            if (process.env.ADDRESSR_ENABLE_GEO) {
+            // Optionally load geocode data if ADDRESSKIT_ENABLE_GEO is set
+            if (process.env.ADDRESSKIT_ENABLE_GEO) {
                 // Load site geocodes (multiple geocodes per address site)
                 loadContext.geoIndexed = {};
                 await loadSiteGeo(
@@ -756,7 +756,7 @@ const initGNAFDataLoader = async (
                 );
             } else {
                 logger(
-                    `Skipping geos. set 'ADDRESSR_ENABLE_GEO' env var to enable`,
+                    `Skipping geos. set 'ADDRESSKIT_ENABLE_GEO' env var to enable`,
                 );
             }
 

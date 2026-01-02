@@ -1,5 +1,5 @@
 {
-    "name": "@repo/addressr-client",
+    "name": "@repo/addresskit-client",
     "private": true,
     "type": "commonjs",
     "main": "dist/elasticsearch.js",
