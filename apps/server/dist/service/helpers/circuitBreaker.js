@@ -114,7 +114,8 @@ class CircuitBreaker {
             windowMs: config?.windowMs ?? DEFAULT_WINDOW_MS,
             name: config?.name ?? "default",
         };
-        logger(`Circuit breaker '${this.config.name}' initialized:`, this.config);
+        if (config_1.VERBOSE)
+            logger(`Circuit breaker '${this.config.name}' initialized:`, this.config);
     }
     /**
      * Executes an async operation with circuit breaker protection.
@@ -134,7 +135,8 @@ class CircuitBreaker {
         if (!this.canExecute()) {
             const retryAfter = this.getRetryAfterMs();
             this.totalRejections++;
-            logger(`Circuit '${this.config.name}' REJECTED request (state: ${this.state})`);
+            if (config_1.VERBOSE)
+                logger(`Circuit '${this.config.name}' REJECTED request (state: ${this.state})`);
             throw new CircuitOpenError(this.config.name, retryAfter);
         }
         // Track operation timing
@@ -192,7 +194,8 @@ class CircuitBreaker {
             success: true,
             durationMs,
         });
-        logger(`Circuit '${this.config.name}' operation SUCCESS (${durationMs}ms)`);
+        if (config_1.VERBOSE)
+            logger(`Circuit '${this.config.name}' operation SUCCESS (${durationMs}ms)`);
         // Update state based on current state
         if (this.state === "HALF_OPEN") {
             this.halfOpenSuccesses++;
@@ -286,7 +289,8 @@ class CircuitBreaker {
         }, this.config.resetTimeoutMs);
         // Prevent timeout from keeping the process alive
         this.resetTimeout.unref();
-        logger(`Circuit '${this.config.name}' transitioned ${previousState} -> OPEN`);
+        if (config_1.VERBOSE)
+            logger(`Circuit '${this.config.name}' transitioned ${previousState} -> OPEN`);
     }
     /**
      * Transitions the circuit to HALF_OPEN state.
@@ -295,7 +299,8 @@ class CircuitBreaker {
         const previousState = this.state;
         this.state = "HALF_OPEN";
         this.halfOpenSuccesses = 0;
-        logger(`Circuit '${this.config.name}' transitioned ${previousState} -> HALF_OPEN`);
+        if (config_1.VERBOSE)
+            logger(`Circuit '${this.config.name}' transitioned ${previousState} -> HALF_OPEN`);
     }
     /**
      * Transitions the circuit to CLOSED state.
@@ -310,7 +315,8 @@ class CircuitBreaker {
             clearTimeout(this.resetTimeout);
             this.resetTimeout = undefined;
         }
-        logger(`Circuit '${this.config.name}' transitioned ${previousState} -> CLOSED`);
+        if (config_1.VERBOSE)
+            logger(`Circuit '${this.config.name}' transitioned ${previousState} -> CLOSED`);
     }
     /**
      * Gets the current state of the circuit.
@@ -361,7 +367,8 @@ class CircuitBreaker {
         this.halfOpenSuccesses = 0;
         this.openedAt = undefined;
         this.closedAt = Date.now();
-        logger(`Circuit '${this.config.name}' manually reset from ${previousState}`);
+        if (config_1.VERBOSE)
+            logger(`Circuit '${this.config.name}' manually reset from ${previousState}`);
     }
     /**
      * Cleans up resources used by the circuit breaker.

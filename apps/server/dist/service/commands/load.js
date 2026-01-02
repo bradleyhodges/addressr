@@ -336,7 +336,8 @@ const unzipGNAFArchive = async (file) => {
                                 if (error_ &&
                                     error_.code !== "ENOENT") {
                                     // Log the error
-                                    (0, index_1.logger)("error statting file", error_);
+                                    if (config_1.VERBOSE)
+                                        (0, index_1.logger)("error statting file", error_);
                                     // Drain the entry
                                     entry.autodrain();
                                     // Call the callback with the error
@@ -347,7 +348,8 @@ const unzipGNAFArchive = async (file) => {
                                 if (stats !== undefined &&
                                     stats.size === entry.size) {
                                     // No need to extract again. Skip
-                                    (0, index_1.logger)("skipping extract for", entryPath);
+                                    if (config_1.VERBOSE)
+                                        (0, index_1.logger)("skipping extract for", entryPath);
                                     entry.autodrain();
                                     callback();
                                 }
@@ -360,12 +362,14 @@ const unzipGNAFArchive = async (file) => {
                                         .pipe(fs.createWriteStream(entryPath))
                                         // On finish, log the message and call the callback
                                         .on("finish", () => {
-                                        (0, index_1.logger)("finished extracting", entryPath);
+                                        if (config_1.VERBOSE)
+                                            (0, index_1.logger)("finished extracting", entryPath);
                                         callback();
                                     })
                                         // On error, log the message and call the callback
                                         .on("error", (error) => {
-                                        (0, index_1.logger)("error unzipping entry", error);
+                                        if (config_1.VERBOSE)
+                                            (0, index_1.logger)("error unzipping entry", error);
                                         callback(error);
                                     });
                                 }
@@ -426,19 +430,55 @@ const computeDocumentHash = (doc) => {
  * @param file - The path to the GNAF file.
  * @param expectedCount - The expected number of rows in the GNAF file.
  * @param context - The context containing the authority code tables.
- * @param options - Loading options.
- * @param options.refresh - Whether to refresh the index after each chunk.
+ * @param options - Loading options including refresh and progress callback.
  *
  * @returns {Promise<void>} - A promise that resolves when the GNAF address details are loaded into the index.
  */
-const loadGNAFAddress = async (file, expectedCount, context, { refresh = false } = {}) => {
+const loadGNAFAddress = async (file, expectedCount, context, options = {}) => {
+    const { refresh = false, onProgress, progressInterval = 250 } = options;
     // Initialize the actual count
     let actualCount = 0;
+    // Progress tracking state
+    const startTime = Date.now();
+    let lastProgressTime = 0;
+    /**
+     * Emits a progress update to the callback if provided.
+     *
+     * @param {boolean} force - Whether to force emit regardless of throttle.
+     */
+    const emitProgress = (force = false) => {
+        if (!onProgress)
+            return;
+        const now = Date.now();
+        if (!force && now - lastProgressTime < progressInterval)
+            return;
+        lastProgressTime = now;
+        // Calculate elapsed time and speed
+        const elapsedMs = now - startTime;
+        const addressesPerSecond = elapsedMs > 0 ? Math.round((actualCount / elapsedMs) * 1000) : 0;
+        // Calculate ETA
+        const remainingAddresses = expectedCount - actualCount;
+        const etaSeconds = addressesPerSecond > 0
+            ? Math.round(remainingAddresses / addressesPerSecond)
+            : 0;
+        // Calculate percentage
+        const percentComplete = expectedCount > 0
+            ? Math.min(100, (actualCount / expectedCount) * 100)
+            : 0;
+        onProgress({
+            processed: actualCount,
+            total: expectedCount,
+            addressesPerSecond,
+            etaSeconds,
+            percentComplete,
+        });
+    };
     // Determine chunk size: use dynamic sizing if enabled, otherwise use configured value
     const chunkSizeMB = config_1.DYNAMIC_RESOURCES_ENABLED
         ? (0, helpers_1.getOptimalChunkSize)()
         : conf_1.LOADING_CHUNK_SIZE;
-    (0, index_1.logger)(`Loading addresses with chunk size: ${chunkSizeMB}MB (dynamic: ${config_1.DYNAMIC_RESOURCES_ENABLED})`);
+    if (config_1.VERBOSE)
+        (0, index_1.logger)(`Loading addresses with chunk size: ${chunkSizeMB}MB (dynamic: ${config_1.DYNAMIC_RESOURCES_ENABLED})`);
     // Create a promise to load the GNAF address details into the index
     await new Promise((resolve, reject) => {
         // Parse the GNAF file with configurable chunk size for memory efficiency
@@ -460,6 +500,8 @@ const loadGNAFAddress = async (file, expectedCount, context, { refresh = false }
                     .then((processedCount) => {
                     // Update the actual count with the number of processed rows
                     actualCount += processedCount;
+                    // Emit progress update
+                    emitProgress();
                     // Check for memory pressure before resuming
                     if (config_1.DYNAMIC_RESOURCES_ENABLED && (0, helpers_1.isMemoryPressure)()) {
                         (0, index_1.logger)("Memory pressure detected, waiting before next chunk...");
@@ -485,7 +527,10 @@ const loadGNAFAddress = async (file, expectedCount, context, { refresh = false }
             },
             // On complete, log the message and resolve
             complete: () => {
-                (0, index_1.logger)("Address details loaded", context.state, expectedCount || "");
+                // Emit final progress
+                emitProgress(true);
+                if (config_1.VERBOSE)
+                    (0, index_1.logger)("Address details loaded", context.state, expectedCount || "");
                 resolve();
             },
             error: (_error, file) => {
@@ -903,13 +948,32 @@ const initGNAFDataLoader = async (directory, { refresh = false } = {}) => {
                 await loadDefaultGeo(files, directory, state, loadContext, filesCounts);
             }
             else {
-                (0, index_1.logger)(`Skipping geos. set 'ADDRESSKIT_ENABLE_GEO' env var to enable`);
+                if (config_1.VERBOSE)
+                    (0, index_1.logger)(`Skipping geos. set 'ADDRESSKIT_ENABLE_GEO' env var to enable`);
             }
             // Load and index the address details for this state
             const expectedCount = filesCounts[detailFile] || 0;
+            const indexingStartTime = Date.now();
             (0, helpers_1.updateSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: Indexing ${(0, helpers_1.formatNumber)(expectedCount)} addresses...`);
-            await loadGNAFAddress(`${directory}/${detailFile}`, filesCounts[detailFile], loadContext, { refresh });
-            (0, helpers_1.succeedSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: ${(0, helpers_1.formatNumber)(expectedCount)} addresses indexed`);
+            await loadGNAFAddress(`${directory}/${detailFile}`, filesCounts[detailFile], loadContext, {
+                refresh,
+                onProgress: (progress) => {
+                    // Build progress display with the terminalUI progress bar
+                    const progressBar = (0, helpers_1.createProgressBar)(progress.processed, progress.total, 20);
+                    // Format speed and ETA
+                    const speed = (0, helpers_1.formatNumber)(progress.addressesPerSecond);
+                    const processed = (0, helpers_1.formatNumber)(progress.processed);
+                    const total = (0, helpers_1.formatNumber)(progress.total);
+                    const eta = progress.etaSeconds > 0
+                        ? (0, helpers_1.formatDuration)(progress.etaSeconds * 1000)
+                        : "calculating...";
+                    // Update spinner text with detailed progress info
+                    (0, helpers_1.updateSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: Indexing  ${progressBar}  ${helpers_1.theme.muted(`${processed} / ${total}`)}  ${helpers_1.theme.secondary(`${speed}/s`)}  ${helpers_1.theme.dim(`ETA: ${eta}`)}`);
+                },
+            });
+            // Calculate total indexing duration for this state
+            const indexingDuration = Date.now() - indexingStartTime;
+            (0, helpers_1.succeedSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: ${(0, helpers_1.formatNumber)(expectedCount)} addresses indexed in ${(0, helpers_1.formatDuration)(indexingDuration)}`);
         }
     }
 };
@@ -1064,7 +1128,8 @@ const loadSiteGeo = async (files, directory, state, loadContext, filesCounts) =>
                         // Log progress at 1% intervals
                         if (expectedCount) {
                             if (count % Math.ceil(expectedCount / 100) === 0) {
-                                (0, index_1.logger)(`${Math.floor((count / expectedCount) * 100)}% (${count}/ ${expectedCount})`);
+                                if (config_1.VERBOSE)
+                                    (0, index_1.logger)(`${Math.floor((count / expectedCount) * 100)}% (${count}/ ${expectedCount})`);
                             }
                         }
                         // Index the geocode by ADDRESS_SITE_PID (may have multiple per site)
@@ -1146,7 +1211,8 @@ const loadDefaultGeo = async (files, directory, state, loadContext, filesCounts)
                         // Log progress at 1% intervals
                         if (expectedCount) {
                             if (count % Math.ceil(expectedCount / 100) === 0) {
-                                (0, index_1.logger)(`${Math.floor((count / expectedCount) * 100)}% (${count}/ ${expectedCount})`);
+                                if (config_1.VERBOSE)
+                                    (0, index_1.logger)(`${Math.floor((count / expectedCount) * 100)}% (${count}/ ${expectedCount})`);
                             }
                         }
                         // Index the geocode by ADDRESS_DETAIL_PID (may have multiple per detail)
@@ -1224,7 +1290,8 @@ const loadAuthFiles = async (files, directory, loadContext, filesCounts) => {
                         }
                         else {
                             // Row count matches - log success and resolve
-                            (0, index_1.logger)(`loaded '${results.data.length}' rows from '${directory}/${authFile}' into key '${contextKey}'`);
+                            if (config_1.VERBOSE)
+                                (0, index_1.logger)(`loaded '${results.data.length}' rows from '${directory}/${authFile}' into key '${contextKey}'`);
                             resolve();
                         }
                     }
@@ -1279,7 +1346,8 @@ const loadCommandEntry = async ({ refresh = false, } = {}) => {
         // Register memory pressure callback to log warnings
         resourceMonitor.onMemoryPressure((snapshot) => {
             const msg = `Memory pressure: ${(0, helpers_1.formatBytes)(snapshot.freeMemory)} free, heap: ${(0, helpers_1.formatBytes)(snapshot.heapUsed)}`;
-            (0, index_1.logger)(msg);
+            if (config_1.VERBOSE)
+                (0, index_1.logger)(msg);
             if (!(0, helpers_1.getDaemonMode)()) {
                 (0, helpers_1.logWarning)(msg);
             }

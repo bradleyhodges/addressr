@@ -10,6 +10,7 @@ const debug_1 = require("debug");
 const express = require("express");
 const js_yaml_1 = require("js-yaml");
 const swagger_tools_1 = require("swagger-tools");
+const config_1 = require("./service/config");
 // Create the express app and set the server port
 const app = express();
 const serverPort = Number.parseInt(process.env.PORT ?? "8080", 10);
@@ -136,9 +137,11 @@ function startServer() {
         // Listen on the server port
         server.listen(serverPort, () => {
             // Log the server listening
-            logger("📡  AddressKit is listening on port %d ( http://localhost:%d ) ", serverPort, serverPort);
+            if (config_1.VERBOSE)
+                logger("📡  AddressKit is listening on port %d ( http://localhost:%d ) ", serverPort, serverPort);
             // Log that the swagger-ui is available
-            logger("📑  Swagger-ui is available on http://localhost:%d/docs", serverPort);
+            if (config_1.VERBOSE)
+                logger("📑  Swagger-ui is available on http://localhost:%d/docs", serverPort);
         });
         // Return the server URL
         return `http://localhost:${serverPort}`;

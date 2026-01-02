@@ -1,27 +1,26 @@
 {
     "name": "@bradleyhodges/addresskit",
-    "version": "2.1.4",
+    "version": "2.1.5",
     "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
-    "packageManager": "pnpm@10.22.0",
-    "publishConfig": {
-        "access": "public"
-    },
-    "engines": {
-        "node": ">=24.0.0"
-    },
     "config": {
         "localport": "6060",
         "SEARCH_IMAGE": "opensearchproject/opensearch:1.3.20"
     },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/bradleyhodges/addresskit.git"
+    "bin": {
+        "addresskit": "apps/server/dist/cli/index.js",
+        "addresskit-loader": "lib/bin/addresskit-loader.js",
+        "addresskit-server": "lib/bin/addresskit-server.js",
+        "addresskit-server-2": "lib/bin/addresskit-server-2.js"
     },
-    "bugs": {
-        "url": "https://github.com/bradleyhodges/addresskit/issues"
-    },
+    "files": [
+        "tooling/scripts/check-version.js",
+        "apps/server/dist/**/*",
+        "packages/core/dist/**/*",
+        "packages/client/dist/**/*"
+    ],
     "scripts": {
         "typecheck": "turbo run typecheck",
+        "build": "pnpm format && pnpm run genversion && turbo run build --filter=@repo/addresskit-core --filter=@repo/addresskit-client --filter=@repo/addresskit-server",
         "dev": "turbo run dev --parallel --filter=!@bradleyhodges/addresskit",
         "smoke": "node tooling/smoke/smoke.mjs",
         "format": "biome check . --write --skip-errors",
@@ -110,7 +109,6 @@
         "test:nodejs:QLD:geo": "PORT=$npm_package_config_localport addresskit_ENABLE_GEO=1 ES_INDEX_NAME=test-geo COVERED_STATES=QLD DEBUG=error,api,express:*,swagger-tools*,test,es TEST_PROFILE=default NODE_OPTIONS=--max_old_space_size=8196 cucumber-js -p default -- --harmony_async_iteration",
         "prebuildX": "npm run genversion && cat ./templates/LICENSE.md | envsubst '${PRODUCT},${VERSION},${COMPANY},${YEAR}' > ./LICENSE.md",
         "prebuild": "npm run genversion",
-        "build": "turbo run build --filter=!@bradleyhodges/addresskit",
         "prebuild:docker": "npm pack && cp .dockerignore.tmpl .dockerignore && echo \"!addresskit-${npm_package_version}.tgz\" >> .dockerignore",
         "build:docker": "docker build --build-arg PACKAGE_TGZ=addresskit-${npm_package_version}.tgz --build-arg PACKAGE=${npm_package_name} --build-arg VERSION=${npm_package_version} --build-arg MAINTAINER=${npm_package_author_email} -t @bradleyhodges/addresskit:${npm_package_version}  -t @bradleyhodges/addresskit:latest .",
         "postbuild": "echo \"postbuild skipped\"",
@@ -127,18 +125,6 @@
         "ci:version": "[ \"$CI\" = true ] && changeset version || echo \"Dry run: changeset version\"",
         "ci:publish": "[ \"$CI\" = true ] && changeset publish || echo \"Dry run: changeset publish\""
     },
-    "bin": {
-        "addresskit": "apps/server/dist/cli/index.js",
-        "addresskit-loader": "lib/bin/addresskit-loader.js",
-        "addresskit-server": "lib/bin/addresskit-server.js",
-        "addresskit-server-2": "lib/bin/addresskit-server-2.js"
-    },
-    "files": [
-        "tooling/scripts/check-version.js",
-        "apps/server/dist/**/*",
-        "packages/core/dist/**/*",
-        "packages/client/dist/**/*"
-    ],
     "keywords": [
         "swagger",
         "g-naf",
@@ -152,6 +138,20 @@
         "geocoding",
         "Geo::StreetAddress:AU"
     ],
+    "packageManager": "pnpm@10.22.0",
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/bradleyhodges/addresskit.git"
+    },
+    "bugs": {
+        "url": "https://github.com/bradleyhodges/addresskit/issues"
+    },
     "license": "GPL-2.0-only",
     "private": true,
     "dependencies": {
@@ -228,11 +228,5 @@
         "prettier-config-standard": "^4.1.0",
         "turbo": "^2.7.2",
         "typescript": "^5.9.3"
-    },
-    "lint-staged": {
-        "*.{js,jsx}": ["eslint --fix", "git add"],
-        "*.{json,css,md}": ["prettier --write", "git add"],
-        "*.{png,jpeg,jpg,gif,svg}": ["imagemin-lint-staged", "git add"],
-        ".circleci/config.yml": ["circleci config validate", "git add"]
     }
 }

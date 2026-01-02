@@ -86,7 +86,8 @@ class LRUCache {
         if (this.config.enableMaintenance) {
             this.startMaintenance();
         }
-        logger(`LRU cache initialized: maxEntries=${this.config.maxEntries}, ttlMs=${this.config.ttlMs}`);
+        if (config_1.VERBOSE)
+            logger(`LRU cache initialized: maxEntries=${this.config.maxEntries}, ttlMs=${this.config.ttlMs}`);
     }
     /**
      * Retrieves a value from the cache if present and not expired.
@@ -124,7 +125,8 @@ class LRUCache {
         // This ensures recently accessed items are at the end
         this.cache.delete(key);
         this.cache.set(key, entry);
-        logger(`Cache HIT: "${key.substring(0, 50)}..." (hits: ${entry.hitCount})`);
+        if (config_1.VERBOSE)
+            logger(`Cache HIT: "${key.substring(0, 50)}..." (hits: ${entry.hitCount})`);
         return entry.value;
     }
     /**
@@ -150,7 +152,8 @@ class LRUCache {
         };
         // Store in cache
         this.cache.set(key, entry);
-        logger(`Cache SET: "${key.substring(0, 50)}..." (size: ${this.cache.size})`);
+        if (config_1.VERBOSE)
+            logger(`Cache SET: "${key.substring(0, 50)}..." (size: ${this.cache.size})`);
     }
     /**
      * Checks if a key exists in the cache and is not expired.
@@ -235,7 +238,8 @@ class LRUCache {
         if (firstKey !== undefined) {
             this.cache.delete(firstKey);
             this.stats.lruEvictions++;
-            logger(`Cache LRU EVICT: "${String(firstKey).substring(0, 50)}..."`);
+            if (config_1.VERBOSE)
+                logger(`Cache LRU EVICT: "${String(firstKey).substring(0, 50)}..."`);
         }
     }
     /**

@@ -204,7 +204,8 @@ class ResourceMonitor {
             MEMORY_PER_OPERATION_MB);
         // Return the minimum of CPU and memory constraints
         const optimalConcurrency = Math.max(1, Math.min(cpuBasedConcurrency, memoryBasedConcurrency));
-        logger(`Optimal concurrency: ${optimalConcurrency} (CPU: ${cpuBasedConcurrency}, Memory: ${memoryBasedConcurrency})`);
+        if (config_1.VERBOSE)
+            logger(`Optimal concurrency: ${optimalConcurrency} (CPU: ${cpuBasedConcurrency}, Memory: ${memoryBasedConcurrency})`);
         return optimalConcurrency;
     }
     /**

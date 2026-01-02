@@ -462,7 +462,8 @@ const getAddresses = async (url, swagger, q, p = 1) => {
         const meta = (0, helpers_1.buildPaginationMeta)(totalHits, page, size);
         // Build the complete JSON:API document
         const jsonApiDocument = (0, helpers_1.buildAutocompleteDocument)(resources, jsonApiLinks, meta);
-        (0, exports.logger)("jsonApiDocument", JSON.stringify(jsonApiDocument, undefined, 2));
+        if (config_1.VERBOSE)
+            (0, exports.logger)("jsonApiDocument", JSON.stringify(jsonApiDocument, undefined, 2));
         // Initialize the Link header for HATEOAS navigation (kept for backwards compatibility)
         const link = new LinkHeader();
         // Add link to API documentation for this operation

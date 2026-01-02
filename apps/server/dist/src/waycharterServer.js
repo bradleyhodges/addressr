@@ -9,6 +9,7 @@ const version_1 = require("@repo/addresskit-core/version");
 const debug_1 = require("debug");
 const express = require("express");
 const service_1 = require("../service");
+const config_1 = require("../service/config");
 const app = express();
 const ONE_DAY = 60 * 60 * 24;
 const ONE_WEEK = ONE_DAY * 7;
@@ -185,7 +186,8 @@ async function startRest2Server() {
      * @returns {void} Nothing; side-effects are logging only.
      */
     const logStartup = () => {
-        logger("📡  AddressKit is listening on port %d ( http://localhost:%d ) ", serverPort, serverPort);
+        if (config_1.VERBOSE)
+            logger("📡  AddressKit is listening on port %d ( http://localhost:%d ) ", serverPort, serverPort);
     };
     /**
      * Starts listening on the configured port and resolves once ready.
