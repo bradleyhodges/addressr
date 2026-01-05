@@ -54,6 +54,15 @@ export const MAX_PAGE_NUMBER =
 export const ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addresskit";
 
 /**
+ * Name of the OpenSearch index for storing locality documents.
+ *
+ * @default "addresskit-localities"
+ * @env ES_LOCALITY_INDEX_NAME
+ */
+export const ES_LOCALITY_INDEX_NAME =
+    process.env.ES_LOCALITY_INDEX_NAME ?? "addresskit-localities";
+
+/**
  * Whether to clear and recreate the index on startup.
  * Setting this to true will delete all existing address data!
  *

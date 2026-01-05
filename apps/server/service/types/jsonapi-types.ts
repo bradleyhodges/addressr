@@ -427,3 +427,67 @@ export type AddressAutocompleteDocument =
  * JSON:API document for single address detail responses.
  */
 export type AddressDetailDocument = JsonApiDocument<AddressDetailAttributes>;
+
+// ============================================================================
+// Locality-Specific JSON:API Types
+// ============================================================================
+
+/**
+ * Minimal locality attributes returned by autocomplete endpoint.
+ * Optimized for fast rendering of suburb/postcode suggestions.
+ */
+export type LocalityAutocompleteAttributes = {
+    /** Display name for the locality (e.g., "SYDNEY NSW 2000") */
+    display: string;
+    /** Relevance score from the search query (0-1 normalized) */
+    rank: number;
+};
+
+/**
+ * Comprehensive locality attributes for detailed lookups.
+ * Contains full locality information from G-NAF.
+ */
+export type LocalityDetailAttributes = {
+    /** G-NAF Locality Persistent Identifier */
+    localityPid: string;
+    /** Locality name (suburb or town name) */
+    name: string;
+    /** Display name including state and postcode (e.g., "SYDNEY NSW 2000") */
+    display: string;
+    /** Locality classification */
+    class?: {
+        code?: string;
+        name?: string;
+    };
+    /** State/territory information */
+    state?: {
+        name?: string;
+        abbreviation?: string;
+    };
+    /** Primary postcode for this locality (if available) */
+    postcode?: string;
+    /** All postcodes associated with this locality */
+    postcodes?: string[];
+};
+
+/**
+ * JSON:API resource for locality autocomplete results.
+ */
+export type LocalityAutocompleteResource =
+    JsonApiResource<LocalityAutocompleteAttributes>;
+
+/**
+ * JSON:API resource for detailed locality information.
+ */
+export type LocalityDetailResource = JsonApiResource<LocalityDetailAttributes>;
+
+/**
+ * JSON:API document for locality autocomplete responses (array of minimal resources).
+ */
+export type LocalityAutocompleteDocument =
+    JsonApiDocument<LocalityAutocompleteAttributes>;
+
+/**
+ * JSON:API document for single locality detail responses.
+ */
+export type LocalityDetailDocument = JsonApiDocument<LocalityDetailAttributes>;

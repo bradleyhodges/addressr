@@ -27,6 +27,7 @@ AddressKit is actively maintained and developed by [Bradley Hodges](https://gith
 AddressKit is a comprehensive solution for managing and validating Australian addresses. Notable features include:
 
 - ✅ **Autocomplete:** Blazingly fast search and autocomplete of Australian addresses based on partial input with result paging, sorting, and filtering
+- ✅ **Locality Search:** Dedicated suburb/postcode autocomplete for when you only need locality lookups without full address results
 - ✅ **Canonical validation**: Validation is built into AddressKit's core data model since every address is resolved from the [G-NAF](https://data.gov.au/data/dataset/geocoded-national-address-file-g-naf) by default, so "valid" automatically means "authoritatively correct"
 - ✅ **Always up-to-date:** AddressKit automatically refreshes its data from the [G-NAF](https://data.gov.au/data/dataset/geocoded-national-address-file-g-naf) every 3 months
 - ✅ **Real-time address validation:** Address validation and autocomplete for Australian addresses
@@ -55,6 +56,8 @@ AddressKit is a comprehensive solution for managing and validating Australian ad
 - [API Endpoints](#api-endpoints)
   - [Search / Autocomplete](#search--autocomplete)
   - [Get Address Details](#get-address-details)
+  - [Search Localities](#search-localities)
+  - [Get Locality Details](#get-locality-details)
   - [Error Responses](#error-responses)
 - [System Requirements](#system-requirements)
   - [Supported Platforms](#supported-platforms)
@@ -455,7 +458,8 @@ addresskit version
 | `ELASTIC_USERNAME` | OpenSearch username (optional) | |
 | `ELASTIC_PASSWORD` | OpenSearch password (optional) | |
 | `PORT` | API server port | `8080` |
-| `ES_INDEX_NAME` | OpenSearch index name | `addresskit` |
+| `ES_INDEX_NAME` | OpenSearch index name for addresses | `addresskit` |
+| `ES_LOCALITY_INDEX_NAME` | OpenSearch index name for localities | `addresskit-localities` |
 | `NODE_ENV` | Environment (`production` or `development`) | `production` |
 
 ### Data Loading
@@ -517,6 +521,9 @@ The AddressKit API conforms to the [JSON:API v1.1 specification](https://jsonapi
 | `/addresses?q=<query>` | GET | Search for addresses (autocomplete) |
 | `/addresses?q=<query>&page[number]=<n>` | GET | Search with pagination |
 | `/addresses/:id` | GET | Get detailed information for a specific address |
+| `/localities?q=<query>` | GET | Search for localities/suburbs (autocomplete) |
+| `/localities?q=<query>&page[number]=<n>` | GET | Search localities with pagination |
+| `/localities/:id` | GET | Get detailed information for a specific locality |
 | `/docs` | GET | OpenAPI/Swagger documentation |
 
 ## Search / Autocomplete
@@ -660,6 +667,110 @@ curl -H "Accept: application/vnd.api+json" \
   },
   "links": {
     "self": "/addresses/GANSW716635811"
+  }
+}
+```
+
+## Search Localities
+
+Search for localities (suburbs/postcodes) matching a query string. Returns lightweight autocomplete suggestions - useful when you only need suburb/postcode lookups without full address autocomplete.
+
+**Request:**
+
+```bash
+curl -H "Accept: application/vnd.api+json" \
+  "http://localhost:8080/localities?q=sydney"
+```
+
+**Response:**
+
+```json
+{
+  "jsonapi": {
+    "version": "1.1"
+  },
+  "data": [
+    {
+      "type": "locality-suggestion",
+      "id": "NSW1234",
+      "attributes": {
+        "display": "SYDNEY NSW 2000",
+        "rank": 1
+      },
+      "links": {
+        "self": "/localities/NSW1234"
+      }
+    },
+    {
+      "type": "locality-suggestion",
+      "id": "NSW5678",
+      "attributes": {
+        "display": "SYDNEY SOUTH NSW 2000",
+        "rank": 0.85
+      },
+      "links": {
+        "self": "/localities/NSW5678"
+      }
+    }
+  ],
+  "links": {
+    "self": "/localities?q=sydney",
+    "first": "/localities?q=sydney",
+    "prev": null,
+    "next": "/localities?q=sydney&page[number]=2",
+    "last": "/localities?q=sydney&page[number]=5"
+  },
+  "meta": {
+    "total": 42,
+    "page": 1,
+    "pageSize": 10,
+    "totalPages": 5
+  }
+}
+```
+
+## Get Locality Details
+
+Retrieve comprehensive details for a specific locality by its G-NAF Locality Persistent Identifier (PID). Use this endpoint after a user selects a locality from the autocomplete results.
+
+**Request:**
+
+```bash
+curl -H "Accept: application/vnd.api+json" \
+  "http://localhost:8080/localities/NSW1234"
+```
+
+**Response:**
+
+```json
+{
+  "jsonapi": {
+    "version": "1.1"
+  },
+  "data": {
+    "type": "locality",
+    "id": "NSW1234",
+    "attributes": {
+      "localityPid": "NSW1234",
+      "name": "SYDNEY",
+      "display": "SYDNEY NSW 2000",
+      "class": {
+        "code": "G",
+        "name": "GAZETTED LOCALITY"
+      },
+      "state": {
+        "name": "New South Wales",
+        "abbreviation": "NSW"
+      },
+      "postcode": "2000",
+      "postcodes": ["2000", "2001"]
+    },
+    "links": {
+      "self": "/localities/NSW1234"
+    }
+  },
+  "links": {
+    "self": "/localities/NSW1234"
   }
 }
 ```

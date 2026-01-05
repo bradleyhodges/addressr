@@ -15,6 +15,8 @@ basePath: '/'
 tags:
   - name: address
     description: Australian address lookup and autocomplete operations
+  - name: locality
+    description: Australian locality (suburb/postcode) lookup and autocomplete operations
 schemes:
   - 'https'
   - 'http'
@@ -176,6 +178,137 @@ paths:
               type: string
         404:
           description: address not found
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+        503:
+          description: service unavailable
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+        500:
+          description: unexpected error 
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+  /localities:
+    get:
+      summary: Search Localities (Autocomplete)
+      operationId: getLocalities
+      x-swagger-router-controller: Localities
+      x-root-rel: localities
+      description: |
+        Searches for localities (suburbs/postcodes) matching the query string and returns
+        lightweight autocomplete suggestions optimized for typeahead UX.
+        
+        Each result contains only the display text and locality ID. Use the
+        `/localities/{localityId}` endpoint to retrieve full locality details.
+        
+        This endpoint is useful when you only need suburb/postcode lookups without
+        full address autocomplete.
+        
+        Results are paginated using JSON:API pagination parameters.
+      tags:
+        - locality
+      parameters:
+        - name: q
+          in: query
+          description: |
+            Search query string. Supports fuzzy matching against locality names,
+            postcodes, and state abbreviations. Minimum 2 characters required.
+          type: string
+          minLength: 2
+          required: true
+        - name: page[number]
+          in: query
+          description: |
+            Page number for pagination (1-indexed). Defaults to 1.
+          type: integer
+          minimum: 1
+          required: false
+        - name: page[size]
+          in: query
+          description: |
+            Number of results per page. Defaults to 10, maximum 100.
+          type: integer
+          minimum: 1
+          maximum: 100
+          required: false
+      responses:
+        200:
+          description: successful query
+          schema:
+            $ref: '#/definitions/LocalityAutocompleteDocument'
+          headers:
+            link:
+              description: RFC 5988 Links for pagination
+              type: array
+              collectionFormat: csv
+              items:
+                type: string
+                pattern: '<(.*)>;(.*)'
+            link-template:
+              description: RFC 6570 Link Templates
+              type: array
+              collectionFormat: csv
+              items:
+                type: string
+                pattern: '<(.*)>;(.*)'
+        400:
+          description: invalid query parameters
+          schema:
+            $ref: '#/definitions/JsonApiErrorDocument'
+        503:
+          description: service unavailable
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+        504:
+          description: gateway timeout
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+        500:
+          description: unexpected error 
+          schema:
+            $ref: "#/definitions/JsonApiErrorDocument"
+  /localities/{localityId}:
+    get:
+      summary: Get Locality Details
+      operationId: getLocality
+      x-swagger-router-controller: Localities
+      description: |
+        Returns comprehensive details about a specific locality by its unique
+        G-NAF Locality Persistent Identifier (PID).
+        
+        The response includes:
+        - Locality name and display format
+        - State/territory information
+        - All postcodes associated with the locality
+        - Locality classification
+      tags:
+        - locality
+      parameters:
+        - name: localityId
+          in: path
+          description: |
+            The unique G-NAF Locality Persistent Identifier (PID) for the locality.
+            Example: `NSW1234`
+          type: string
+          required: true
+      responses:
+        200:
+          description: successful query
+          schema:
+            $ref: '#/definitions/LocalityDetailDocument'
+          headers:
+            link:
+              description: RFC 5988 Links
+              type: array
+              collectionFormat: csv
+              items:
+                type: string
+                pattern: '<(.*)>;(.*)'
+            ETag:
+              description: Entity tag for cache validation
+              type: string
+        404:
+          description: locality not found
           schema:
             $ref: "#/definitions/JsonApiErrorDocument"
         503:
@@ -821,6 +954,222 @@ definitions:
           self: /addresses/GANT_718592778
       links:
         self: /addresses/GANT_718592778
+  
+  # ============================================================================
+  # Locality Autocomplete Types
+  # ============================================================================
+  LocalityAutocompleteAttributes:
+    type: object
+    description: Minimal locality data for autocomplete suggestions
+    required:
+      - display
+      - rank
+    properties:
+      display:
+        type: string
+        description: Display name for the locality (e.g., "SYDNEY NSW 2000")
+        example: SYDNEY NSW 2000
+      rank:
+        type: number
+        format: float
+        description: Relevance score normalized to 0-1 range (1 = best match)
+        minimum: 0
+        maximum: 1
+        example: 0.95
+  
+  LocalityAutocompleteResource:
+    type: object
+    description: JSON:API resource for a locality autocomplete suggestion
+    required:
+      - type
+      - id
+      - attributes
+    properties:
+      type:
+        type: string
+        enum: [locality-suggestion]
+        description: Resource type identifier
+        example: locality-suggestion
+      id:
+        type: string
+        description: Unique locality identifier (G-NAF Locality PID)
+        example: NSW1234
+      attributes:
+        $ref: '#/definitions/LocalityAutocompleteAttributes'
+      links:
+        type: object
+        properties:
+          self:
+            type: string
+            description: Link to full locality details
+            example: /localities/NSW1234
+  
+  LocalityAutocompleteDocument:
+    type: object
+    description: JSON:API document containing locality autocomplete results
+    required:
+      - data
+    properties:
+      jsonapi:
+        $ref: '#/definitions/JsonApiVersion'
+      data:
+        type: array
+        items:
+          $ref: '#/definitions/LocalityAutocompleteResource'
+        description: Array of locality autocomplete suggestion resources
+      links:
+        $ref: '#/definitions/JsonApiLinks'
+      meta:
+        $ref: '#/definitions/JsonApiMeta'
+    example:
+      jsonapi:
+        version: "1.1"
+      data:
+        - type: locality-suggestion
+          id: NSW1234
+          attributes:
+            display: SYDNEY NSW 2000
+            rank: 1
+          links:
+            self: /localities/NSW1234
+        - type: locality-suggestion
+          id: NSW5678
+          attributes:
+            display: SYDNEY SOUTH NSW 2000
+            rank: 0.85
+          links:
+            self: /localities/NSW5678
+      links:
+        self: /localities?q=sydney
+        first: /localities?q=sydney
+        prev: null
+        next: /localities?q=sydney&page[number]=2
+        last: /localities?q=sydney&page[number]=5
+      meta:
+        total: 42
+        page: 1
+        pageSize: 10
+        totalPages: 5
+  
+  # ============================================================================
+  # Locality Detail Types
+  # ============================================================================
+  LocalityClass:
+    type: object
+    description: Locality classification
+    properties:
+      code:
+        type: string
+        example: G
+        maxLength: 1
+      name:
+        type: string
+        example: GAZETTED LOCALITY
+        maxLength: 50
+  
+  LocalityDetailAttributes:
+    type: object
+    description: Complete locality details
+    required:
+      - localityPid
+      - name
+      - display
+    properties:
+      localityPid:
+        type: string
+        description: G-NAF Locality Persistent Identifier
+        example: NSW1234
+      name:
+        type: string
+        description: Locality name (suburb or town name)
+        example: SYDNEY
+        maxLength: 100
+      display:
+        type: string
+        description: Display name including state and postcode
+        example: SYDNEY NSW 2000
+      class:
+        $ref: '#/definitions/LocalityClass'
+      state:
+        $ref: '#/definitions/AddressState'
+      postcode:
+        type: string
+        pattern: '^\d{4}$'
+        example: '2000'
+        description: Primary Australian 4-digit postcode for this locality
+      postcodes:
+        type: array
+        items:
+          type: string
+          pattern: '^\d{4}$'
+        description: All postcodes associated with this locality
+        example: ['2000', '2001']
+  
+  LocalityDetailResource:
+    type: object
+    description: JSON:API resource for a detailed locality
+    required:
+      - type
+      - id
+      - attributes
+    properties:
+      type:
+        type: string
+        enum: [locality]
+        description: Resource type identifier
+        example: locality
+      id:
+        type: string
+        description: Unique locality identifier (G-NAF Locality PID)
+        example: NSW1234
+      attributes:
+        $ref: '#/definitions/LocalityDetailAttributes'
+      links:
+        type: object
+        properties:
+          self:
+            type: string
+            description: Self-referential link
+            example: /localities/NSW1234
+  
+  LocalityDetailDocument:
+    type: object
+    description: JSON:API document containing detailed locality information
+    required:
+      - data
+    properties:
+      jsonapi:
+        $ref: '#/definitions/JsonApiVersion'
+      data:
+        $ref: '#/definitions/LocalityDetailResource'
+      links:
+        type: object
+        properties:
+          self:
+            type: string
+            example: /localities/NSW1234
+    example:
+      jsonapi:
+        version: "1.1"
+      data:
+        type: locality
+        id: NSW1234
+        attributes:
+          localityPid: NSW1234
+          name: SYDNEY
+          display: SYDNEY NSW 2000
+          class:
+            code: G
+            name: GAZETTED LOCALITY
+          state:
+            name: New South Wales
+            abbreviation: NSW
+          postcode: '2000'
+          postcodes: ['2000', '2001']
+        links:
+          self: /localities/NSW1234
+      links:
+        self: /localities/NSW1234
   
   # ============================================================================
   # Root Types

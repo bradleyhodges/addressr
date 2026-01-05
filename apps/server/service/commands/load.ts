@@ -2,7 +2,10 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as stream from "node:stream";
-import { initIndex } from "@repo/addresskit-client/elasticsearch";
+import {
+    initIndex,
+    initLocalityIndex,
+} from "@repo/addresskit-client/elasticsearch";
 import download from "@repo/addresskit-core/utils/stream-down";
 import directoryExists from "directory-exists";
 import * as got from "got";
@@ -13,6 +16,7 @@ import {
     ENABLE_GEO,
     ES_CLEAR_INDEX,
     ES_INDEX_NAME,
+    ES_LOCALITY_INDEX_NAME,
     GNAF_DIR,
     GNAF_PACKAGE_URL,
     INDEX_BACKOFF_INCREMENT,
@@ -1112,6 +1116,116 @@ const getStateName = async (abbr: string, file: string): Promise<string> => {
 };
 
 /**
+ * Indexes localities for a state into the localities OpenSearch index.
+ *
+ * This function reads the address detail file to collect postcodes for each locality,
+ * then indexes all localities with their associated postcodes for suburb/postcode
+ * autocomplete functionality.
+ *
+ * @param context - The mapping context containing locality data and state information.
+ * @param addressDetailFile - Path to the ADDRESS_DETAIL PSV file for postcode extraction.
+ * @param refresh - Whether to refresh the index after indexing.
+ * @returns A promise that resolves when all localities are indexed.
+ */
+const indexLocalitiesForState = async (
+    context: Types.MapPropertyContext,
+    addressDetailFile: string,
+    refresh: boolean,
+): Promise<void> => {
+    // Build a mapping of locality PID -> postcodes from the address detail file
+    const localityPostcodes: Record<string, Set<string>> = {};
+
+    // Parse the address detail file to extract postcode associations
+    await new Promise<void>((resolve, reject) => {
+        Papa.parse(fs.createReadStream(addressDetailFile), {
+            header: true,
+            delimiter: "|",
+            chunk: (
+                chunk: Papa.ParseResult<Types.AddressDetailRow>,
+                // biome-ignore lint/suspicious/noExplicitAny: papaparse parser type
+                parser: any,
+            ) => {
+                // Process each row to collect postcodes for localities
+                for (const row of chunk.data) {
+                    const localityPid = row.LOCALITY_PID;
+                    const postcode = row.POSTCODE;
+
+                    // Skip rows without locality or postcode
+                    if (!localityPid || !postcode) continue;
+
+                    // Initialize the set if needed
+                    if (localityPostcodes[localityPid] === undefined) {
+                        localityPostcodes[localityPid] = new Set<string>();
+                    }
+
+                    // Add the postcode to the locality's set
+                    localityPostcodes[localityPid].add(postcode);
+                }
+            },
+            complete: () => resolve(),
+            error: (parseError: Error) => reject(parseError),
+        });
+    });
+
+    // Get the indexed localities and authority code context
+    const localityIndexed = context.localityIndexed ?? {};
+    const state = context.state ?? "";
+    const stateName = context.stateName ?? "";
+
+    // Get the locality class code lookup from context
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic authority code context
+    const localityClassCode = (context as any).LOCALITY_CLASS_AUT ?? {};
+
+    // Build the bulk indexing body for localities
+    const indexingBody: Types.BulkIndexBody = [];
+
+    for (const [localityPid, localityData] of Object.entries(localityIndexed)) {
+        // Get postcodes for this locality (sorted for consistency)
+        const postcodes = localityPostcodes[localityPid]
+            ? Array.from(localityPostcodes[localityPid]).sort()
+            : [];
+
+        // Use the first postcode as the primary (most common for display)
+        const primaryPostcode = postcodes[0] ?? "";
+
+        // Get the locality class name from authority code
+        const classCode = localityData.LOCALITY_CLASS_CODE ?? "";
+        const className = localityClassCode[classCode]?.NAME ?? classCode ?? "";
+
+        // Build the display string (e.g., "SYDNEY NSW 2000")
+        const display = primaryPostcode
+            ? `${localityData.LOCALITY_NAME} ${state} ${primaryPostcode}`
+            : `${localityData.LOCALITY_NAME} ${state}`;
+
+        // Add the index operation header
+        indexingBody.push({
+            index: {
+                _index: ES_LOCALITY_INDEX_NAME,
+                _id: `/localities/${localityPid}`,
+            },
+        });
+
+        // Add the locality document body
+        indexingBody.push({
+            display,
+            name: localityData.LOCALITY_NAME,
+            localityPid,
+            stateAbbreviation: state,
+            stateName,
+            postcode: primaryPostcode,
+            postcodes,
+            classCode,
+            className,
+        });
+    }
+
+    // Send the bulk index request if we have localities to index
+    if (indexingBody.length > 0) {
+        await sendIndexRequest(indexingBody, undefined, { refresh });
+    }
+};
+
+/**
  * Loads all G-NAF data from the specified directory into the OpenSearch index.
  *
  * This function orchestrates the entire GNAF loading process:
@@ -1173,6 +1287,9 @@ const initGNAFDataLoader = async (
 
     // Initialize the OpenSearch index with synonyms and appropriate mappings
     await initIndex(global.esClient, ES_CLEAR_INDEX, synonyms);
+
+    // Initialize the OpenSearch locality index for suburb/postcode search
+    await initLocalityIndex(global.esClient, ES_CLEAR_INDEX);
 
     // Find all ADDRESS_DETAIL files in the Standard directory for each state
     const addressDetailFiles = files.filter(
@@ -1322,6 +1439,19 @@ const initGNAFDataLoader = async (
             const indexingDuration = Date.now() - indexingStartTime;
             succeedSpinner(
                 `${stateProgress} ${formatState(state)}: ${formatNumber(expectedCount)} addresses indexed in ${formatDuration(indexingDuration)}`,
+            );
+
+            // Index localities for this state
+            const localitySpinner = startSpinner(
+                `${stateProgress} ${formatState(state)}: Indexing localities...`,
+            );
+            await indexLocalitiesForState(
+                loadContext as unknown as Types.MapPropertyContext,
+                `${directory}/${detailFile}`,
+                refresh,
+            );
+            succeedSpinner(
+                `${stateProgress} ${formatState(state)}: Localities indexed`,
             );
         }
     }

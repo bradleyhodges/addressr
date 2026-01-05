@@ -29,9 +29,15 @@ const logger = debug("api");
 const error = debug("error");
 
 /**
- * The name of the Elasticsearch index.
+ * The name of the Elasticsearch index for addresses.
  */
 const ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addresskit";
+
+/**
+ * The name of the Elasticsearch index for localities.
+ */
+const ES_LOCALITY_INDEX_NAME =
+    process.env.ES_LOCALITY_INDEX_NAME ?? "addresskit-localities";
 
 /**
  * Configuration values for the Elasticsearch server
@@ -235,6 +241,202 @@ export async function initIndex(
     if (VERBOSE)
         logger(
             `indexGetResult:\n${JSON.stringify(indexGetResult, undefined, 2)}`,
+        );
+}
+
+/**
+ * Shape of the locality index configuration payload we send to OpenSearch.
+ */
+type LocalityIndexBody = {
+    settings: Record<string, unknown>;
+    aliases: Record<string, unknown>;
+    mappings: Record<string, unknown>;
+};
+
+/**
+ * Drops the configured OpenSearch locality index if it exists.
+ *
+ * @param esClient - Connected OpenSearch client.
+ * @returns Resolves after the index is removed or confirmed absent.
+ */
+export async function dropLocalityIndex(esClient: Client): Promise<void> {
+    // Check if the index exists
+    const exists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME,
+    });
+
+    // If the index exists, delete it
+    if (exists.body === true) {
+        const deleteIndexResult = await esClient.indices.delete({
+            index: ES_LOCALITY_INDEX_NAME,
+        });
+
+        // Log the result
+        if (VERBOSE) logger({ deleteIndexResult });
+    }
+
+    // Check if the index exists again
+    const postExists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME,
+    });
+
+    // Log the result
+    if (VERBOSE) logger("locality index exists:", postExists);
+}
+
+/**
+ * Ensures the locality index exists and is configured with analyzers and mappings.
+ *
+ * @param esClient - Connected OpenSearch client.
+ * @param clear - When true, drop the index before recreating.
+ * @returns Resolves once the index is ready.
+ */
+export async function initLocalityIndex(
+    esClient: Client,
+    clear?: boolean,
+): Promise<void> {
+    // If the clear flag is set, drop the index
+    if (clear) await dropLocalityIndex(esClient);
+
+    // Check if the index exists
+    const exists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME,
+    });
+    if (VERBOSE) logger("locality index exists:", exists.body);
+
+    // Build the index body with mappings optimized for locality search
+    const indexBody: LocalityIndexBody = {
+        settings: {
+            index: {
+                analysis: {
+                    filter: {
+                        comma_stripper: {
+                            type: "pattern_replace",
+                            pattern: ",",
+                            replacement: "",
+                        },
+                    },
+                    analyzer: {
+                        locality_analyzer: {
+                            tokenizer: "whitecomma",
+                            filter: [
+                                "uppercase",
+                                "asciifolding",
+                                "comma_stripper",
+                                "trim",
+                            ],
+                        },
+                    },
+                    tokenizer: {
+                        whitecomma: {
+                            type: "pattern",
+                            pattern: "[\\W,]+",
+                            lowercase: false,
+                        },
+                    },
+                },
+            },
+        },
+        aliases: {},
+        mappings: {
+            properties: {
+                // Display string for autocomplete (e.g., "SYDNEY NSW 2000")
+                display: {
+                    type: "text",
+                    analyzer: "locality_analyzer",
+                    fields: {
+                        raw: {
+                            type: "keyword",
+                        },
+                    },
+                },
+                // Locality name for searching
+                name: {
+                    type: "text",
+                    analyzer: "locality_analyzer",
+                    fields: {
+                        raw: {
+                            type: "keyword",
+                        },
+                    },
+                },
+                // State abbreviation for filtering
+                stateAbbreviation: {
+                    type: "keyword",
+                },
+                // State full name
+                stateName: {
+                    type: "keyword",
+                },
+                // Primary postcode
+                postcode: {
+                    type: "keyword",
+                },
+                // All postcodes associated with this locality
+                postcodes: {
+                    type: "keyword",
+                },
+                // Locality class code
+                classCode: {
+                    type: "keyword",
+                },
+                // Locality class name
+                className: {
+                    type: "keyword",
+                },
+                // Original G-NAF locality PID
+                localityPid: {
+                    type: "keyword",
+                },
+            },
+        },
+    };
+
+    // If the index does not exist, create it
+    if (exists.body !== true) {
+        if (VERBOSE)
+            logger(`creating locality index: ${ES_LOCALITY_INDEX_NAME}`);
+        const indexCreateResult = await esClient.indices.create({
+            index: ES_LOCALITY_INDEX_NAME,
+            body: indexBody,
+        });
+        if (VERBOSE) logger({ indexCreateResult });
+    } else {
+        // When the index already exists, update settings and mappings then reopen.
+        const indexCloseResult = await esClient.indices.close({
+            index: ES_LOCALITY_INDEX_NAME,
+        });
+        if (VERBOSE) logger({ indexCloseResult });
+        const indexPutSettingsResult = await esClient.indices.putSettings({
+            index: ES_LOCALITY_INDEX_NAME,
+            body: indexBody,
+        });
+        if (VERBOSE) logger({ indexPutSettingsResult });
+        const indexPutMappingResult = await esClient.indices.putMapping({
+            index: ES_LOCALITY_INDEX_NAME,
+            body: indexBody.mappings,
+        });
+        if (VERBOSE) logger({ indexPutMappingResult });
+        const indexOpenResult = await esClient.indices.open({
+            index: ES_LOCALITY_INDEX_NAME,
+        });
+        if (VERBOSE) logger({ indexOpenResult });
+        const refreshResult = await esClient.indices.refresh({
+            index: ES_LOCALITY_INDEX_NAME,
+        });
+        if (VERBOSE) logger({ refreshResult });
+    }
+
+    // Get the index
+    const indexGetResult = await esClient.indices.get({
+        index: ES_LOCALITY_INDEX_NAME,
+        include_defaults: true,
+    });
+
+    // Log the result
+    if (VERBOSE)
+        logger(
+            `localityIndexGetResult:\n${JSON.stringify(indexGetResult, undefined, 2)}`,
         );
 }
 

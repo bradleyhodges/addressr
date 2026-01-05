@@ -17,6 +17,10 @@ import type {
     JsonApiLinks,
     JsonApiMeta,
     JsonApiResource,
+    LocalityAutocompleteAttributes,
+    LocalityAutocompleteDocument,
+    LocalityDetailAttributes,
+    LocalityDetailDocument,
 } from "../types/jsonapi-types";
 
 /**
@@ -34,6 +38,10 @@ export const RESOURCE_TYPES = {
     ADDRESS: "address",
     /** Resource type for autocomplete suggestions */
     ADDRESS_SUGGESTION: "address-suggestion",
+    /** Resource type for locality entities */
+    LOCALITY: "locality",
+    /** Resource type for locality autocomplete suggestions */
+    LOCALITY_SUGGESTION: "locality-suggestion",
 } as const;
 
 /**
@@ -45,6 +53,17 @@ export const RESOURCE_TYPES = {
  */
 export const extractAddressId = (path: string): string => {
     return path.replace(/^\/addresses\//, "");
+};
+
+/**
+ * Extracts the locality ID from a full resource path.
+ * Converts "/localities/NSW1234" to "NSW1234".
+ *
+ * @param path - Full path including the resource prefix.
+ * @returns The extracted locality ID.
+ */
+export const extractLocalityId = (path: string): string => {
+    return path.replace(/^\/localities\//, "");
 };
 
 /**
@@ -96,6 +115,56 @@ export const buildAddressResource = (
         attributes,
         links: {
             self: `/addresses/${id}`,
+        },
+    };
+};
+
+/**
+ * Builds a JSON:API resource object for a locality autocomplete suggestion.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param display - Display string for the locality (e.g., "SYDNEY NSW 2000").
+ * @param rank - Search relevance score (0-1 normalized).
+ * @returns A JSON:API resource object for the locality autocomplete result.
+ */
+export const buildLocalityAutocompleteResource = (
+    id: string,
+    display: string,
+    rank: number,
+): JsonApiResource<LocalityAutocompleteAttributes> => {
+    // Construct the attributes object
+    const attributes: LocalityAutocompleteAttributes = {
+        display,
+        rank,
+    };
+
+    return {
+        type: RESOURCE_TYPES.LOCALITY_SUGGESTION,
+        id,
+        attributes,
+        links: {
+            self: `/localities/${id}`,
+        },
+    };
+};
+
+/**
+ * Builds a JSON:API resource object for a detailed locality.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param attributes - Complete locality attributes including state and postcodes.
+ * @returns A JSON:API resource object for the locality.
+ */
+export const buildLocalityResource = (
+    id: string,
+    attributes: LocalityDetailAttributes,
+): JsonApiResource<LocalityDetailAttributes> => {
+    return {
+        type: RESOURCE_TYPES.LOCALITY,
+        id,
+        attributes,
+        links: {
+            self: `/localities/${id}`,
         },
     };
 };
@@ -169,6 +238,11 @@ export const API_WARNINGS = {
         "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.",
     /** Warning when a search query returns no matching results */
     NO_RESULTS: "No addresses matched your search query.",
+    /** Warning when the locality dataset is empty (no localities loaded) */
+    EMPTY_LOCALITY_DATASET:
+        "No localities are currently loaded in the dataset. Please run the data loader to populate the locality index.",
+    /** Warning when a locality search query returns no matching results */
+    NO_LOCALITY_RESULTS: "No localities matched your search query.",
 } as const;
 
 /**
@@ -230,6 +304,45 @@ export const buildAutocompleteDocument = (
 export const buildAddressDetailDocument = (
     resource: JsonApiResource<AddressDetailAttributes>,
 ): AddressDetailDocument => {
+    return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resource,
+        links: {
+            self: resource.links?.self,
+        },
+    };
+};
+
+/**
+ * Builds a complete JSON:API document for locality autocomplete responses.
+ *
+ * @param resources - Array of locality autocomplete resource objects.
+ * @param links - Pagination and navigation links.
+ * @param meta - Response metadata including pagination info.
+ * @returns Complete JSON:API document for locality autocomplete results.
+ */
+export const buildLocalityAutocompleteDocument = (
+    resources: JsonApiResource<LocalityAutocompleteAttributes>[],
+    links: JsonApiLinks,
+    meta: JsonApiMeta,
+): LocalityAutocompleteDocument => {
+    return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resources,
+        links,
+        meta,
+    };
+};
+
+/**
+ * Builds a complete JSON:API document for a single locality detail response.
+ *
+ * @param resource - The locality resource object.
+ * @returns Complete JSON:API document for the locality.
+ */
+export const buildLocalityDetailDocument = (
+    resource: JsonApiResource<LocalityDetailAttributes>,
+): LocalityDetailDocument => {
     return {
         jsonapi: JSONAPI_IMPLEMENTATION,
         data: resource,
