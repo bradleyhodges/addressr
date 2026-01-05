@@ -3,6 +3,10 @@
     "ui": "tui",
     "globalDependencies": [".babelrc", "tsconfig.base.json"],
     "tasks": {
+        "dev": {
+            "cache": false,
+            "persistent": true
+        },
         "build": {
             "dependsOn": ["^build"],
             "inputs": [
