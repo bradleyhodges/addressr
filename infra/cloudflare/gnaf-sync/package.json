@@ -1,0 +1,25 @@
+{
+    "name": "gnaf-sync",
+    "version": "1.0.0",
+    "description": "G-NAF data sync script for AddressKit mirror",
+    "type": "module",
+    "main": "sync.ts",
+    "scripts": {
+        "sync": "tsx --env-file=.env sync.ts",
+        "sync:dry-run": "tsx --env-file=.env sync.ts --dry-run",
+        "deploy": "wrangler deploy",
+        "check": "tsx --env-file=.env sync.ts --check-only"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.700.0",
+        "@aws-sdk/lib-storage": "^3.700.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.7.0"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}

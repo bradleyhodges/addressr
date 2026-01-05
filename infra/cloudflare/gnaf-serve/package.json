@@ -1,0 +1,17 @@
+{
+    "name": "gnaf-serve",
+    "version": "1.0.0",
+    "description": "Cloudflare Worker for serving the AddressKit G-NAF mirror",
+    "type": "module",
+    "main": "src/index.ts",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "tail": "wrangler tail"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20241127.0",
+        "typescript": "^5.7.0",
+        "wrangler": "^3.90.0"
+    }
+}

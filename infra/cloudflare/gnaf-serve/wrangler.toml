@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# AddressKit G-NAF Mirror Serve Worker
+# ═══════════════════════════════════════════════════════════════════════════════
+# This Cloudflare Worker serves the G-NAF mirror content from DigitalOcean Spaces.
+#
+# Deployment:
+#   1. Configure secrets: wrangler secret put DO_SPACES_KEY, etc.
+#   2. Deploy: pnpm deploy
+#
+# Routes:
+#   GET /                           - Mirror status and info
+#   GET /package_show.conf.json     - Mirror configuration (cached)
+#   GET /gnaf-latest                - Redirect to latest G-NAF ZIP (GDA94)
+#   GET /gnaf-latest-gda2020        - Redirect to latest G-NAF ZIP (GDA2020)
+#   GET /gnaf/*                     - Proxy/redirect to mirrored files
+#   GET /health                     - Health check endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name = "gnaf-serve"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Custom domain
+routes = [
+  { pattern = "dl.addresskit.com.au/*", zone_name = "addresskit.com.au" }
+]
+
+# Environment variables (non-secret)
+[vars]
+DO_SPACES_ENDPOINT = "syd1.digitaloceanspaces.com"
+DO_SPACES_BUCKET = "addresskit"
+CACHE_TTL_CONFIG = "3600"        # 1 hour for config
+CACHE_TTL_FILES = "86400"        # 24 hours for data files
+
+# Production environment
+[env.production]
+name = "gnaf-serve"
+
+# Staging environment for testing
+[env.staging]
+name = "gnaf-serve-staging"
+routes = [
+  { pattern = "dl-staging.addresskit.com.au/*", zone_name = "addresskit.com.au" }
+]
+
