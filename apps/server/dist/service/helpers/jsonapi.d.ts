@@ -5,7 +5,7 @@
  * for the AddressKit API. These utilities ensure consistent response formatting
  * across all endpoints.
  */
-import type { AddressAutocompleteAttributes, AddressAutocompleteDocument, AddressDetailAttributes, AddressDetailDocument, JsonApiError, JsonApiErrorDocument, JsonApiLinks, JsonApiMeta, JsonApiResource } from "../types/jsonapi-types";
+import type { AddressAutocompleteAttributes, AddressAutocompleteDocument, AddressDetailAttributes, AddressDetailDocument, JsonApiError, JsonApiErrorDocument, JsonApiLinks, JsonApiMeta, JsonApiResource, LocalityAutocompleteAttributes, LocalityAutocompleteDocument, LocalityDetailAttributes, LocalityDetailDocument } from "../types/jsonapi-types";
 /**
  * Resource type constants for consistent naming across the API.
  */
@@ -14,6 +14,10 @@ export declare const RESOURCE_TYPES: {
     readonly ADDRESS: "address";
     /** Resource type for autocomplete suggestions */
     readonly ADDRESS_SUGGESTION: "address-suggestion";
+    /** Resource type for locality entities */
+    readonly LOCALITY: "locality";
+    /** Resource type for locality autocomplete suggestions */
+    readonly LOCALITY_SUGGESTION: "locality-suggestion";
 };
 /**
  * Extracts the address ID from a full resource path.
@@ -23,6 +27,14 @@ export declare const RESOURCE_TYPES: {
  * @returns The extracted address ID.
  */
 export declare const extractAddressId: (path: string) => string;
+/**
+ * Extracts the locality ID from a full resource path.
+ * Converts "/localities/NSW1234" to "NSW1234".
+ *
+ * @param path - Full path including the resource prefix.
+ * @returns The extracted locality ID.
+ */
+export declare const extractLocalityId: (path: string) => string;
 /**
  * Builds a JSON:API resource object for an autocomplete suggestion.
  *
@@ -42,6 +54,23 @@ export declare const buildAutocompleteResource: (id: string, sla: string, rank: 
  */
 export declare const buildAddressResource: (id: string, attributes: AddressDetailAttributes) => JsonApiResource<AddressDetailAttributes>;
 /**
+ * Builds a JSON:API resource object for a locality autocomplete suggestion.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param display - Display string for the locality (e.g., "SYDNEY NSW 2000").
+ * @param rank - Search relevance score (0-1 normalized).
+ * @returns A JSON:API resource object for the locality autocomplete result.
+ */
+export declare const buildLocalityAutocompleteResource: (id: string, display: string, rank: number) => JsonApiResource<LocalityAutocompleteAttributes>;
+/**
+ * Builds a JSON:API resource object for a detailed locality.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param attributes - Complete locality attributes including state and postcodes.
+ * @returns A JSON:API resource object for the locality.
+ */
+export declare const buildLocalityResource: (id: string, attributes: LocalityDetailAttributes) => JsonApiResource<LocalityDetailAttributes>;
+/**
  * Builds pagination links for a collection response.
  *
  * @param baseUrl - Base URL for the resource collection (e.g., "/addresses").
@@ -60,6 +89,10 @@ export declare const API_WARNINGS: {
     readonly EMPTY_DATASET: "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.";
     /** Warning when a search query returns no matching results */
     readonly NO_RESULTS: "No addresses matched your search query.";
+    /** Warning when the locality dataset is empty (no localities loaded) */
+    readonly EMPTY_LOCALITY_DATASET: "No localities are currently loaded in the dataset. Please run the data loader to populate the locality index.";
+    /** Warning when a locality search query returns no matching results */
+    readonly NO_LOCALITY_RESULTS: "No localities matched your search query.";
 };
 /**
  * Builds metadata for a paginated collection response.
@@ -88,6 +121,22 @@ export declare const buildAutocompleteDocument: (resources: JsonApiResource<Addr
  * @returns Complete JSON:API document for the address.
  */
 export declare const buildAddressDetailDocument: (resource: JsonApiResource<AddressDetailAttributes>) => AddressDetailDocument;
+/**
+ * Builds a complete JSON:API document for locality autocomplete responses.
+ *
+ * @param resources - Array of locality autocomplete resource objects.
+ * @param links - Pagination and navigation links.
+ * @param meta - Response metadata including pagination info.
+ * @returns Complete JSON:API document for locality autocomplete results.
+ */
+export declare const buildLocalityAutocompleteDocument: (resources: JsonApiResource<LocalityAutocompleteAttributes>[], links: JsonApiLinks, meta: JsonApiMeta) => LocalityAutocompleteDocument;
+/**
+ * Builds a complete JSON:API document for a single locality detail response.
+ *
+ * @param resource - The locality resource object.
+ * @returns Complete JSON:API document for the locality.
+ */
+export declare const buildLocalityDetailDocument: (resource: JsonApiResource<LocalityDetailAttributes>) => LocalityDetailDocument;
 /**
  * Builds a JSON:API error object.
  *

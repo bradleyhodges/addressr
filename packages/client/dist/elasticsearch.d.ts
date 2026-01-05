@@ -34,6 +34,21 @@ type SynonymsList = string[] | undefined;
  */
 export declare function initIndex(esClient: Client, clear?: boolean, synonyms?: SynonymsList): Promise<void>;
 /**
+ * Drops the configured OpenSearch locality index if it exists.
+ *
+ * @param esClient - Connected OpenSearch client.
+ * @returns Resolves after the index is removed or confirmed absent.
+ */
+export declare function dropLocalityIndex(esClient: Client): Promise<void>;
+/**
+ * Ensures the locality index exists and is configured with analyzers and mappings.
+ *
+ * @param esClient - Connected OpenSearch client.
+ * @param clear - When true, drop the index before recreating.
+ * @returns Resolves once the index is ready.
+ */
+export declare function initLocalityIndex(esClient: Client, clear?: boolean): Promise<void>;
+/**
  * Connects to OpenSearch, waiting for the port to be reachable and retrying until success.
  *
  * @param {number} [esport=ELASTIC_PORT] - Target OpenSearch port.

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchForAddress = exports.setAddresses = exports.mapToJsonApiAutocompleteResponse = exports.mapToSearchAddressResponse = exports.getAddresses = exports.getAddress = exports.gotClient = exports.keepAliveAgent = exports.gnafHttpCache = exports.cache = exports.error = exports.logger = exports.readdir = exports.fsp = void 0;
+exports.searchForLocality = exports.searchForAddress = exports.setAddresses = exports.mapToJsonApiAutocompleteResponse = exports.mapToSearchAddressResponse = exports.getLocalities = exports.getLocality = exports.getAddresses = exports.getAddress = exports.gotClient = exports.keepAliveAgent = exports.gnafHttpCache = exports.cache = exports.error = exports.logger = exports.readdir = exports.fsp = void 0;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const node_https_1 = require("node:https");
@@ -693,11 +693,417 @@ const mapToSearchAddressResponse = (foundAddresses) => {
 };
 exports.mapToSearchAddressResponse = mapToSearchAddressResponse;
 /**
+ * Checks if the locality index is empty (contains no documents).
+ *
+ * @returns A promise resolving to true if the index is empty or doesn't exist, false otherwise.
+ */
+const isLocalityIndexEmpty = async () => {
+    try {
+        const circuit = (0, helpers_1.getOpenSearchCircuit)();
+        const countResponse = await circuit.execute(async () => {
+            return await global.esClient.count({
+                index: conf_1.ES_LOCALITY_INDEX_NAME,
+            });
+        });
+        return countResponse.body.count === 0;
+    }
+    catch {
+        // If we can't determine the count (index not found, etc.), assume empty
+        return true;
+    }
+};
+/**
+ * Searches for localities matching a query string.
+ *
+ * @param searchString - The search string to match against localities.
+ * @param p - The page number (1-indexed).
+ * @param pageSize - The page size.
+ * @returns A promise resolving to the OpenSearch search response with pagination metadata.
+ */
+const searchForLocality = async (searchString, p, pageSize = conf_1.PAGE_SIZE) => {
+    // Normalize the inbound search string
+    const normalizedSearch = (searchString ?? "").trim().replace(/\s+/g, " ");
+    // Reject empty searches
+    if (normalizedSearch === "") {
+        throw new Error("Search query must not be empty after normalization");
+    }
+    // Validate pagination parameters
+    const safePage = Number.isFinite(p) ? p : 1;
+    const safeSize = Number.isFinite(pageSize)
+        ? pageSize
+        : conf_1.PAGE_SIZE;
+    const validPage = Math.max(1, Math.min(safePage, conf_1.MAX_PAGE_NUMBER));
+    const validSize = Math.max(1, Math.min(safeSize, conf_1.MAX_PAGE_SIZE));
+    // Calculate the offset for OpenSearch
+    const from = (validPage - 1) * validSize;
+    // Execute search with circuit breaker protection
+    const circuit = (0, helpers_1.getOpenSearchCircuit)();
+    const searchResp = await circuit.execute(async () => {
+        return (await global.esClient.search({
+            index: conf_1.ES_LOCALITY_INDEX_NAME,
+            body: {
+                from,
+                size: validSize,
+                _source: [
+                    "display",
+                    "name",
+                    "localityPid",
+                    "stateAbbreviation",
+                    "stateName",
+                    "postcode",
+                    "postcodes",
+                    "classCode",
+                    "className",
+                ],
+                query: {
+                    bool: {
+                        should: [
+                            // Highest boost: Display starts with the search query (exact prefix match)
+                            {
+                                prefix: {
+                                    "display.raw": {
+                                        value: normalizedSearch.toUpperCase(),
+                                        boost: 100,
+                                    },
+                                },
+                            },
+                            // High boost: Locality name starts with search query
+                            {
+                                prefix: {
+                                    "name.raw": {
+                                        value: normalizedSearch.toUpperCase(),
+                                        boost: 80,
+                                    },
+                                },
+                            },
+                            // Medium boost: Postcode match
+                            {
+                                term: {
+                                    postcode: {
+                                        value: normalizedSearch,
+                                        boost: 60,
+                                    },
+                                },
+                            },
+                            // Medium boost: Match on any of the postcodes
+                            {
+                                term: {
+                                    postcodes: {
+                                        value: normalizedSearch,
+                                        boost: 50,
+                                    },
+                                },
+                            },
+                            // Phrase prefix match on display
+                            {
+                                match_phrase_prefix: {
+                                    display: {
+                                        query: normalizedSearch,
+                                        boost: 40,
+                                    },
+                                },
+                            },
+                            // Phrase prefix match on name
+                            {
+                                match_phrase_prefix: {
+                                    name: {
+                                        query: normalizedSearch,
+                                        boost: 30,
+                                    },
+                                },
+                            },
+                            // Fuzzy match for typo tolerance
+                            {
+                                multi_match: {
+                                    fields: ["display", "name"],
+                                    query: normalizedSearch,
+                                    fuzziness: "AUTO",
+                                    type: "bool_prefix",
+                                    lenient: true,
+                                    operator: "AND",
+                                },
+                            },
+                        ],
+                    },
+                },
+                sort: ["_score", { "name.raw": { order: "asc" } }],
+            },
+        }));
+    });
+    // Extract the total hit count
+    const rawTotal = searchResp.body.hits.total;
+    const totalHits = typeof rawTotal === "number" ? rawTotal : rawTotal.value;
+    return {
+        searchResponse: searchResp,
+        page: validPage,
+        size: validSize,
+        totalHits: totalHits ?? 0,
+    };
+};
+exports.searchForLocality = searchForLocality;
+/**
+ * Retrieves detailed information about a specific locality by its ID.
+ *
+ * @param localityId - The unique identifier for the locality (G-NAF Locality PID).
+ * @returns A promise resolving to the locality response.
+ */
+const getLocality = async (localityId) => {
+    try {
+        // Get the circuit breaker for OpenSearch operations
+        const circuit = (0, helpers_1.getOpenSearchCircuit)();
+        // Query OpenSearch for the locality document
+        const jsonX = await circuit.execute(async () => {
+            return await global.esClient.get({
+                index: conf_1.ES_LOCALITY_INDEX_NAME,
+                id: `/localities/${localityId}`,
+            });
+        });
+        if (config_1.VERBOSE)
+            (0, exports.logger)("locality jsonX", jsonX);
+        // Extract the source data from OpenSearch response
+        const source = jsonX.body._source;
+        // Build the JSON:API locality detail attributes
+        const attributes = {
+            localityPid: source.localityPid,
+            name: source.name,
+            display: source.display,
+            ...(source.classCode !== undefined && {
+                class: {
+                    code: source.classCode,
+                    name: source.className,
+                },
+            }),
+            ...(source.stateAbbreviation !== undefined && {
+                state: {
+                    name: source.stateName,
+                    abbreviation: source.stateAbbreviation,
+                },
+            }),
+            ...(source.postcode !== undefined && { postcode: source.postcode }),
+            ...(source.postcodes !== undefined && {
+                postcodes: source.postcodes,
+            }),
+        };
+        // Build the JSON:API resource and document
+        const resource = (0, helpers_1.buildLocalityResource)(localityId, attributes);
+        const jsonApiDocument = (0, helpers_1.buildLocalityDetailDocument)(resource);
+        // Construct HATEOAS self-link for the locality resource
+        const link = new http_link_header_1.default();
+        link.set({
+            rel: "self",
+            uri: `/localities/${localityId}`,
+        });
+        // Compute hash for ETag
+        const hash = crypto
+            .createHash("md5")
+            .update(JSON.stringify(jsonApiDocument))
+            .digest("hex");
+        return { link, json: jsonApiDocument, hash };
+    }
+    catch (error_) {
+        // Handle circuit breaker open state
+        if (error_ instanceof helpers_1.CircuitOpenError) {
+            (0, exports.error)("Circuit breaker open for OpenSearch", error_);
+            const retryAfterSeconds = Math.ceil(error_.retryAfterMs / 1000);
+            return {
+                statusCode: 503,
+                json: helpers_1.ErrorDocuments.serviceUnavailable(retryAfterSeconds),
+            };
+        }
+        // Cast to OpenSearch error type
+        const osError = error_;
+        (0, exports.error)("error getting locality from elastic search", osError);
+        // Handle document not found
+        if (osError.body?.found === false) {
+            return {
+                statusCode: 404,
+                json: helpers_1.ErrorDocuments.notFound("locality", localityId),
+            };
+        }
+        // Handle index not ready/available
+        if (osError.body?.error?.type === "index_not_found_exception") {
+            return {
+                statusCode: 503,
+                json: helpers_1.ErrorDocuments.serviceUnavailable(),
+            };
+        }
+        // Fallback for unexpected errors
+        return {
+            statusCode: 500,
+            json: helpers_1.ErrorDocuments.internalError(),
+        };
+    }
+};
+exports.getLocality = getLocality;
+/**
+ * Searches for localities matching a query string with pagination support.
+ *
+ * @param url - The base URL for the localities endpoint.
+ * @param swagger - Swagger/OpenAPI context for API documentation linkage.
+ * @param q - The search query string for locality matching.
+ * @param p - The page number for pagination (1-indexed).
+ * @returns A promise resolving to the localities response.
+ */
+const getLocalities = async (url, swagger, q, p = 1) => {
+    try {
+        // Normalize inbound search
+        const normalizedQuery = (q ?? "").trim().replace(/\s+/g, " ");
+        if (normalizedQuery === "") {
+            return {
+                statusCode: 400,
+                json: helpers_1.ErrorDocuments.badRequest("The 'q' query parameter is required and must not be empty.", "q"),
+            };
+        }
+        // Execute the locality search query
+        const { searchResponse: foundLocalities, page, size, totalHits, } = await searchForLocality(normalizedQuery, p);
+        if (config_1.VERBOSE)
+            (0, exports.logger)("foundLocalities", foundLocalities);
+        // Calculate pagination values
+        const totalPages = Math.ceil(totalHits / size);
+        // Build JSON:API autocomplete resources from search hits
+        const maxScore = foundLocalities.body.hits.hits[0]
+            ? foundLocalities.body.hits.hits[0]._score
+            : 1;
+        const resources = foundLocalities.body.hits.hits.map((h) => {
+            const hit = h;
+            const localityId = (0, helpers_1.extractLocalityId)(hit._id);
+            const normalizedRank = maxScore > 0 ? hit._score / maxScore : 0;
+            return (0, helpers_1.buildLocalityAutocompleteResource)(localityId, hit._source.display, normalizedRank);
+        });
+        // Build JSON:API pagination links
+        const jsonApiLinks = (0, helpers_1.buildPaginationLinks)(url, normalizedQuery, page, totalPages);
+        // Add API documentation link
+        jsonApiLinks.describedby = {
+            href: `/docs/#operations-${swagger.path.get["x-swagger-router-controller"].toLowerCase()}-${swagger.path.get.operationId}`,
+            title: `${swagger.path.get.operationId} API Docs`,
+            type: "text/html",
+        };
+        // Determine if a warning should be included
+        let warning;
+        if (totalHits === 0) {
+            const datasetEmpty = await isLocalityIndexEmpty();
+            warning = datasetEmpty
+                ? helpers_1.API_WARNINGS.EMPTY_LOCALITY_DATASET
+                : helpers_1.API_WARNINGS.NO_LOCALITY_RESULTS;
+        }
+        // Build JSON:API pagination metadata
+        const meta = (0, helpers_1.buildPaginationMeta)(totalHits, page, size, undefined, warning);
+        // Build the complete JSON:API document
+        const jsonApiDocument = (0, helpers_1.buildLocalityAutocompleteDocument)(resources, jsonApiLinks, meta);
+        // Initialize the Link header for HATEOAS navigation
+        const link = new http_link_header_1.default();
+        // Add link to API documentation
+        link.set({
+            rel: "describedby",
+            uri: `/docs/#operations-${swagger.path.get["x-swagger-router-controller"].toLowerCase()}-${swagger.path.get.operationId}`,
+            title: `${swagger.path.get.operationId} API Docs`,
+            type: "text/html",
+        });
+        // Build query string for the current request
+        const sp = new URLSearchParams({
+            ...(normalizedQuery !== "" && { q: normalizedQuery }),
+            ...(page !== 1 && { "page[number]": String(page) }),
+        });
+        const spString = sp.toString();
+        // Add self-referential link
+        link.set({
+            rel: "self",
+            uri: `${url}${spString === "" ? "" : "?"}${spString}`,
+        });
+        // Add link to the first page
+        link.set({
+            rel: "first",
+            uri: `${url}${normalizedQuery === "" ? "" : "?"}${new URLSearchParams({
+                ...(normalizedQuery !== "" && { q: normalizedQuery }),
+            }).toString()}`,
+        });
+        // Add previous page link if not on first page
+        if (page > 1) {
+            link.set({
+                rel: "prev",
+                uri: `${url}${normalizedQuery === "" && page === 2 ? "" : "?"}${new URLSearchParams({
+                    ...(normalizedQuery !== "" && { q: normalizedQuery }),
+                    ...(page > 2 && { "page[number]": String(page - 1) }),
+                }).toString()}`,
+            });
+        }
+        // Determine if there are more pages available
+        const hasNextPage = totalHits > size * page;
+        // Add next page link if more results exist
+        if (hasNextPage) {
+            link.set({
+                rel: "next",
+                uri: `${url}?${new URLSearchParams({
+                    ...(normalizedQuery !== "" && { q: normalizedQuery }),
+                    "page[number]": String(page + 1),
+                }).toString()}`,
+            });
+        }
+        // Add last page link
+        if (totalPages > 0) {
+            link.set({
+                rel: "last",
+                uri: `${url}?${new URLSearchParams({
+                    ...(normalizedQuery !== "" && { q: normalizedQuery }),
+                    ...(totalPages > 1 && {
+                        "page[number]": String(totalPages),
+                    }),
+                }).toString()}`,
+            });
+        }
+        // Construct Link-Template header
+        const linkTemplate = new http_link_header_1.default();
+        const op = swagger.path.get;
+        (0, setLinkOptions_1.setLinkOptions)(op, url, linkTemplate);
+        return {
+            link,
+            json: jsonApiDocument,
+            linkTemplate,
+        };
+    }
+    catch (error_) {
+        // Handle circuit breaker open state
+        if (error_ instanceof helpers_1.CircuitOpenError) {
+            (0, exports.error)("Circuit breaker open for OpenSearch", error_);
+            const retryAfterSeconds = Math.ceil(error_.retryAfterMs / 1000);
+            return {
+                statusCode: 503,
+                json: helpers_1.ErrorDocuments.serviceUnavailable(retryAfterSeconds),
+            };
+        }
+        // Cast to OpenSearch error type
+        const osError = error_;
+        (0, exports.error)("error querying localities in elastic search", osError);
+        // Handle index not ready/available
+        if (osError.body?.error?.type === "index_not_found_exception") {
+            return {
+                statusCode: 503,
+                json: helpers_1.ErrorDocuments.serviceUnavailable(),
+            };
+        }
+        // Handle OpenSearch request timeout
+        if (osError.displayName === "RequestTimeout") {
+            return {
+                statusCode: 504,
+                json: helpers_1.ErrorDocuments.gatewayTimeout(),
+            };
+        }
+        // Fallback for unexpected errors
+        return {
+            statusCode: 500,
+            json: helpers_1.ErrorDocuments.internalError(),
+        };
+    }
+};
+exports.getLocalities = getLocalities;
+/**
  * The default export for the service. These are the commands that can be used to interact with the service.
  */
 exports.default = {
     load: load_1.loadCommandEntry,
     autocomplete: getAddresses,
     lookup: getAddress,
+    localityAutocomplete: getLocalities,
+    localityLookup: getLocality,
 };
 //# sourceMappingURL=index.js.map

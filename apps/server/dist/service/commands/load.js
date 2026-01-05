@@ -873,6 +873,96 @@ const getStateName = async (abbr, file) => {
     });
 };
 /**
+ * Indexes localities for a state into the localities OpenSearch index.
+ *
+ * This function reads the address detail file to collect postcodes for each locality,
+ * then indexes all localities with their associated postcodes for suburb/postcode
+ * autocomplete functionality.
+ *
+ * @param context - The mapping context containing locality data and state information.
+ * @param addressDetailFile - Path to the ADDRESS_DETAIL PSV file for postcode extraction.
+ * @param refresh - Whether to refresh the index after indexing.
+ * @returns A promise that resolves when all localities are indexed.
+ */
+const indexLocalitiesForState = async (context, addressDetailFile, refresh) => {
+    // Build a mapping of locality PID -> postcodes from the address detail file
+    const localityPostcodes = {};
+    // Parse the address detail file to extract postcode associations
+    await new Promise((resolve, reject) => {
+        Papa.parse(fs.createReadStream(addressDetailFile), {
+            header: true,
+            delimiter: "|",
+            chunk: (chunk, 
+            // biome-ignore lint/suspicious/noExplicitAny: papaparse parser type
+            parser) => {
+                // Process each row to collect postcodes for localities
+                for (const row of chunk.data) {
+                    const localityPid = row.LOCALITY_PID;
+                    const postcode = row.POSTCODE;
+                    // Skip rows without locality or postcode
+                    if (!localityPid || !postcode)
+                        continue;
+                    // Initialize the set if needed
+                    if (localityPostcodes[localityPid] === undefined) {
+                        localityPostcodes[localityPid] = new Set();
+                    }
+                    // Add the postcode to the locality's set
+                    localityPostcodes[localityPid].add(postcode);
+                }
+            },
+            complete: () => resolve(),
+            error: (parseError) => reject(parseError),
+        });
+    });
+    // Get the indexed localities and authority code context
+    const localityIndexed = context.localityIndexed ?? {};
+    const state = context.state ?? "";
+    const stateName = context.stateName ?? "";
+    // Get the locality class code lookup from context
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic authority code context
+    const localityClassCode = context.LOCALITY_CLASS_AUT ?? {};
+    // Build the bulk indexing body for localities
+    const indexingBody = [];
+    for (const [localityPid, localityData] of Object.entries(localityIndexed)) {
+        // Get postcodes for this locality (sorted for consistency)
+        const postcodes = localityPostcodes[localityPid]
+            ? Array.from(localityPostcodes[localityPid]).sort()
+            : [];
+        // Use the first postcode as the primary (most common for display)
+        const primaryPostcode = postcodes[0] ?? "";
+        // Get the locality class name from authority code
+        const classCode = localityData.LOCALITY_CLASS_CODE ?? "";
+        const className = localityClassCode[classCode]?.NAME ?? classCode ?? "";
+        // Build the display string (e.g., "SYDNEY NSW 2000")
+        const display = primaryPostcode
+            ? `${localityData.LOCALITY_NAME} ${state} ${primaryPostcode}`
+            : `${localityData.LOCALITY_NAME} ${state}`;
+        // Add the index operation header
+        indexingBody.push({
+            index: {
+                _index: conf_1.ES_LOCALITY_INDEX_NAME,
+                _id: `/localities/${localityPid}`,
+            },
+        });
+        // Add the locality document body
+        indexingBody.push({
+            display,
+            name: localityData.LOCALITY_NAME,
+            localityPid,
+            stateAbbreviation: state,
+            stateName,
+            postcode: primaryPostcode,
+            postcodes,
+            classCode,
+            className,
+        });
+    }
+    // Send the bulk index request if we have localities to index
+    if (indexingBody.length > 0) {
+        await (0, exports.sendIndexRequest)(indexingBody, undefined, { refresh });
+    }
+};
+/**
  * Loads all G-NAF data from the specified directory into the OpenSearch index.
  *
  * This function orchestrates the entire GNAF loading process:
@@ -924,6 +1014,8 @@ const initGNAFDataLoader = async (directory, { refresh = false } = {}) => {
     const synonyms = (0, helpers_1.buildSynonyms)(loadContext);
     // Initialize the OpenSearch index with synonyms and appropriate mappings
     await (0, elasticsearch_1.initIndex)(global.esClient, conf_1.ES_CLEAR_INDEX, synonyms);
+    // Initialize the OpenSearch locality index for suburb/postcode search
+    await (0, elasticsearch_1.initLocalityIndex)(global.esClient, conf_1.ES_CLEAR_INDEX);
     // Find all ADDRESS_DETAIL files in the Standard directory for each state
     const addressDetailFiles = files.filter((f) => f.match(/ADDRESS_DETAIL/) && f.match(/\/Standard\//));
     if (config_1.VERBOSE)
@@ -1013,6 +1105,10 @@ const initGNAFDataLoader = async (directory, { refresh = false } = {}) => {
             // Calculate total indexing duration for this state
             const indexingDuration = Date.now() - indexingStartTime;
             (0, helpers_1.succeedSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: ${(0, helpers_1.formatNumber)(expectedCount)} addresses indexed in ${(0, helpers_1.formatDuration)(indexingDuration)}`);
+            // Index localities for this state
+            const localitySpinner = (0, helpers_1.startSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: Indexing localities...`);
+            await indexLocalitiesForState(loadContext, `${directory}/${detailFile}`, refresh);
+            (0, helpers_1.succeedSpinner)(`${stateProgress} ${(0, helpers_1.formatState)(state)}: Localities indexed`);
         }
     }
 };

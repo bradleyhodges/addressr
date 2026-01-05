@@ -9,7 +9,7 @@
  * @deprecated Import from "./config" directly for new code
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.COVERED_STATES = exports.TARGET_MEMORY_UTILIZATION = exports.DYNAMIC_RESOURCES_ENABLED = exports.CIRCUIT_SUCCESS_THRESHOLD = exports.CIRCUIT_RESET_TIMEOUT_MS = exports.CIRCUIT_FAILURE_THRESHOLD = exports.CACHE_ENABLED = exports.CACHE_TTL_MS = exports.CACHE_MAX_ENTRIES = exports.CORS_ALLOW_HEADERS = exports.CORS_EXPOSE_HEADERS = exports.CORS_ALLOW_ORIGIN = exports.SERVER_PORT = exports.THIRTY_DAYS_MS = exports.ONE_DAY_MS = exports.ONE_DAY_S = exports.GNAF_DIR = exports.GNAF_PACKAGE_URL = exports.ENABLE_GEO = exports.LOADING_CHUNK_SIZE = exports.INDEX_TIMEOUT = exports.INDEX_MAX_RETRIES = exports.INDEX_BACKOFF_MAX = exports.INDEX_BACKOFF_INCREMENT = exports.INDEX_BACKOFF_INITIAL = exports.ES_CLEAR_INDEX = exports.ES_INDEX_NAME = exports.MAX_PAGE_NUMBER = exports.MAX_PAGE_SIZE = exports.PAGE_SIZE = void 0;
+exports.COVERED_STATES = exports.TARGET_MEMORY_UTILIZATION = exports.DYNAMIC_RESOURCES_ENABLED = exports.CIRCUIT_SUCCESS_THRESHOLD = exports.CIRCUIT_RESET_TIMEOUT_MS = exports.CIRCUIT_FAILURE_THRESHOLD = exports.CACHE_ENABLED = exports.CACHE_TTL_MS = exports.CACHE_MAX_ENTRIES = exports.CORS_ALLOW_HEADERS = exports.CORS_EXPOSE_HEADERS = exports.CORS_ALLOW_ORIGIN = exports.SERVER_PORT = exports.THIRTY_DAYS_MS = exports.ONE_DAY_MS = exports.ONE_DAY_S = exports.GNAF_DIR = exports.GNAF_PACKAGE_URL = exports.ENABLE_GEO = exports.LOADING_CHUNK_SIZE = exports.INDEX_TIMEOUT = exports.INDEX_MAX_RETRIES = exports.INDEX_BACKOFF_MAX = exports.INDEX_BACKOFF_INCREMENT = exports.INDEX_BACKOFF_INITIAL = exports.ES_CLEAR_INDEX = exports.ES_LOCALITY_INDEX_NAME = exports.ES_INDEX_NAME = exports.MAX_PAGE_NUMBER = exports.MAX_PAGE_SIZE = exports.PAGE_SIZE = void 0;
 const getCoveredStates_1 = require("./helpers/getCoveredStates");
 // Re-export all configuration values from the centralized config module
 var config_1 = require("./config");
@@ -17,6 +17,7 @@ Object.defineProperty(exports, "PAGE_SIZE", { enumerable: true, get: function ()
 Object.defineProperty(exports, "MAX_PAGE_SIZE", { enumerable: true, get: function () { return config_1.MAX_PAGE_SIZE; } });
 Object.defineProperty(exports, "MAX_PAGE_NUMBER", { enumerable: true, get: function () { return config_1.MAX_PAGE_NUMBER; } });
 Object.defineProperty(exports, "ES_INDEX_NAME", { enumerable: true, get: function () { return config_1.ES_INDEX_NAME; } });
+Object.defineProperty(exports, "ES_LOCALITY_INDEX_NAME", { enumerable: true, get: function () { return config_1.ES_LOCALITY_INDEX_NAME; } });
 Object.defineProperty(exports, "ES_CLEAR_INDEX", { enumerable: true, get: function () { return config_1.ES_CLEAR_INDEX; } });
 Object.defineProperty(exports, "INDEX_BACKOFF_INITIAL", { enumerable: true, get: function () { return config_1.INDEX_BACKOFF_INITIAL; } });
 Object.defineProperty(exports, "INDEX_BACKOFF_INCREMENT", { enumerable: true, get: function () { return config_1.INDEX_BACKOFF_INCREMENT; } });

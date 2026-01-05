@@ -9,7 +9,7 @@
  * @module config
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VERBOSE = exports.TARGET_MEMORY_UTILIZATION = exports.DYNAMIC_RESOURCES_ENABLED = exports.CIRCUIT_SUCCESS_THRESHOLD = exports.CIRCUIT_RESET_TIMEOUT_MS = exports.CIRCUIT_FAILURE_THRESHOLD = exports.CACHE_ENABLED = exports.CACHE_TTL_MS = exports.CACHE_MAX_ENTRIES = exports.CORS_ALLOW_HEADERS = exports.CORS_EXPOSE_HEADERS = exports.CORS_ALLOW_ORIGIN = exports.SERVER_PORT = exports.THIRTY_DAYS_MS = exports.ONE_DAY_MS = exports.ONE_DAY_S = exports.GNAF_DIR = exports.GNAF_PACKAGE_URL = exports.ENABLE_GEO = exports.LOADING_CHUNK_SIZE = exports.INDEX_TIMEOUT = exports.INDEX_MAX_RETRIES = exports.INDEX_BACKOFF_MAX = exports.INDEX_BACKOFF_INCREMENT = exports.INDEX_BACKOFF_INITIAL = exports.ES_CLEAR_INDEX = exports.ES_INDEX_NAME = exports.MAX_PAGE_NUMBER = exports.MAX_PAGE_SIZE = exports.PAGE_SIZE = void 0;
+exports.VERBOSE = exports.TARGET_MEMORY_UTILIZATION = exports.DYNAMIC_RESOURCES_ENABLED = exports.CIRCUIT_SUCCESS_THRESHOLD = exports.CIRCUIT_RESET_TIMEOUT_MS = exports.CIRCUIT_FAILURE_THRESHOLD = exports.CACHE_ENABLED = exports.CACHE_TTL_MS = exports.CACHE_MAX_ENTRIES = exports.CORS_ALLOW_HEADERS = exports.CORS_EXPOSE_HEADERS = exports.CORS_ALLOW_ORIGIN = exports.SERVER_PORT = exports.THIRTY_DAYS_MS = exports.ONE_DAY_MS = exports.ONE_DAY_S = exports.GNAF_DIR = exports.GNAF_PACKAGE_URL = exports.ENABLE_GEO = exports.LOADING_CHUNK_SIZE = exports.INDEX_TIMEOUT = exports.INDEX_MAX_RETRIES = exports.INDEX_BACKOFF_MAX = exports.INDEX_BACKOFF_INCREMENT = exports.INDEX_BACKOFF_INITIAL = exports.ES_CLEAR_INDEX = exports.ES_LOCALITY_INDEX_NAME = exports.ES_INDEX_NAME = exports.MAX_PAGE_NUMBER = exports.MAX_PAGE_SIZE = exports.PAGE_SIZE = void 0;
 // ---------------------------------------------------------------------------------
 // Pagination Configuration
 // ---------------------------------------------------------------------------------
@@ -47,6 +47,13 @@ exports.MAX_PAGE_NUMBER = Number.parseInt(process.env.MAX_PAGE_NUMBER ?? "1000",
  * @env ES_INDEX_NAME
  */
 exports.ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addresskit";
+/**
+ * Name of the OpenSearch index for storing locality documents.
+ *
+ * @default "addresskit-localities"
+ * @env ES_LOCALITY_INDEX_NAME
+ */
+exports.ES_LOCALITY_INDEX_NAME = process.env.ES_LOCALITY_INDEX_NAME ?? "addresskit-localities";
 /**
  * Whether to clear and recreate the index on startup.
  * Setting this to true will delete all existing address data!

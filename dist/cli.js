@@ -39,7 +39,7 @@ var version;
 var init_version = __esm({
   "packages/core/version.ts"() {
     "use strict";
-    version = "2.3.0";
+    version = "2.4.0";
   }
 });
 
@@ -24729,6 +24729,8 @@ var require_elasticsearch = __commonJS({
     exports2.VERBOSE = exports2.ELASTIC_PORT = void 0;
     exports2.dropIndex = dropIndex;
     exports2.initIndex = initIndex3;
+    exports2.dropLocalityIndex = dropLocalityIndex;
+    exports2.initLocalityIndex = initLocalityIndex2;
     exports2.esConnect = esConnect3;
     var opensearch_1 = require_opensearch();
     var debug_1 = __importDefault3(require_src());
@@ -24736,6 +24738,7 @@ var require_elasticsearch = __commonJS({
     var logger8 = (0, debug_1.default)("api");
     var error8 = (0, debug_1.default)("error");
     var ES_INDEX_NAME2 = process.env.ES_INDEX_NAME ?? "addresskit";
+    var ES_LOCALITY_INDEX_NAME2 = process.env.ES_LOCALITY_INDEX_NAME ?? "addresskit-localities";
     exports2.ELASTIC_PORT = Number.parseInt(process.env.ELASTIC_PORT ?? "9200", 10);
     var ELASTIC_HOST = process.env.ELASTIC_HOST ?? "127.0.0.1";
     var ELASTIC_USERNAME = process.env.ELASTIC_USERNAME ?? void 0;
@@ -24872,6 +24875,163 @@ var require_elasticsearch = __commonJS({
       });
       if (exports2.VERBOSE)
         logger8(`indexGetResult:
+${JSON.stringify(indexGetResult, void 0, 2)}`);
+    }
+    async function dropLocalityIndex(esClient) {
+      const exists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME2
+      });
+      if (exists.body === true) {
+        const deleteIndexResult = await esClient.indices.delete({
+          index: ES_LOCALITY_INDEX_NAME2
+        });
+        if (exports2.VERBOSE)
+          logger8({ deleteIndexResult });
+      }
+      const postExists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME2
+      });
+      if (exports2.VERBOSE)
+        logger8("locality index exists:", postExists);
+    }
+    async function initLocalityIndex2(esClient, clear) {
+      if (clear)
+        await dropLocalityIndex(esClient);
+      const exists = await esClient.indices.exists({
+        index: ES_LOCALITY_INDEX_NAME2
+      });
+      if (exports2.VERBOSE)
+        logger8("locality index exists:", exists.body);
+      const indexBody = {
+        settings: {
+          index: {
+            analysis: {
+              filter: {
+                comma_stripper: {
+                  type: "pattern_replace",
+                  pattern: ",",
+                  replacement: ""
+                }
+              },
+              analyzer: {
+                locality_analyzer: {
+                  tokenizer: "whitecomma",
+                  filter: [
+                    "uppercase",
+                    "asciifolding",
+                    "comma_stripper",
+                    "trim"
+                  ]
+                }
+              },
+              tokenizer: {
+                whitecomma: {
+                  type: "pattern",
+                  pattern: "[\\W,]+",
+                  lowercase: false
+                }
+              }
+            }
+          }
+        },
+        aliases: {},
+        mappings: {
+          properties: {
+            // Display string for autocomplete (e.g., "SYDNEY NSW 2000")
+            display: {
+              type: "text",
+              analyzer: "locality_analyzer",
+              fields: {
+                raw: {
+                  type: "keyword"
+                }
+              }
+            },
+            // Locality name for searching
+            name: {
+              type: "text",
+              analyzer: "locality_analyzer",
+              fields: {
+                raw: {
+                  type: "keyword"
+                }
+              }
+            },
+            // State abbreviation for filtering
+            stateAbbreviation: {
+              type: "keyword"
+            },
+            // State full name
+            stateName: {
+              type: "keyword"
+            },
+            // Primary postcode
+            postcode: {
+              type: "keyword"
+            },
+            // All postcodes associated with this locality
+            postcodes: {
+              type: "keyword"
+            },
+            // Locality class code
+            classCode: {
+              type: "keyword"
+            },
+            // Locality class name
+            className: {
+              type: "keyword"
+            },
+            // Original G-NAF locality PID
+            localityPid: {
+              type: "keyword"
+            }
+          }
+        }
+      };
+      if (exists.body !== true) {
+        if (exports2.VERBOSE)
+          logger8(`creating locality index: ${ES_LOCALITY_INDEX_NAME2}`);
+        const indexCreateResult = await esClient.indices.create({
+          index: ES_LOCALITY_INDEX_NAME2,
+          body: indexBody
+        });
+        if (exports2.VERBOSE)
+          logger8({ indexCreateResult });
+      } else {
+        const indexCloseResult = await esClient.indices.close({
+          index: ES_LOCALITY_INDEX_NAME2
+        });
+        if (exports2.VERBOSE)
+          logger8({ indexCloseResult });
+        const indexPutSettingsResult = await esClient.indices.putSettings({
+          index: ES_LOCALITY_INDEX_NAME2,
+          body: indexBody
+        });
+        if (exports2.VERBOSE)
+          logger8({ indexPutSettingsResult });
+        const indexPutMappingResult = await esClient.indices.putMapping({
+          index: ES_LOCALITY_INDEX_NAME2,
+          body: indexBody.mappings
+        });
+        if (exports2.VERBOSE)
+          logger8({ indexPutMappingResult });
+        const indexOpenResult = await esClient.indices.open({
+          index: ES_LOCALITY_INDEX_NAME2
+        });
+        if (exports2.VERBOSE)
+          logger8({ indexOpenResult });
+        const refreshResult = await esClient.indices.refresh({
+          index: ES_LOCALITY_INDEX_NAME2
+        });
+        if (exports2.VERBOSE)
+          logger8({ refreshResult });
+      }
+      const indexGetResult = await esClient.indices.get({
+        index: ES_LOCALITY_INDEX_NAME2,
+        include_defaults: true
+      });
+      if (exports2.VERBOSE)
+        logger8(`localityIndexGetResult:
 ${JSON.stringify(indexGetResult, void 0, 2)}`);
     }
     async function esConnect3(esport = exports2.ELASTIC_PORT, eshost = ELASTIC_HOST, interval = 1e3, timeout = 0) {
@@ -35682,7 +35842,7 @@ var init_getCoveredStates = __esm({
 });
 
 // apps/server/service/config.ts
-var PAGE_SIZE, MAX_PAGE_SIZE, MAX_PAGE_NUMBER, ES_INDEX_NAME, ES_CLEAR_INDEX, INDEX_BACKOFF_INITIAL, INDEX_BACKOFF_INCREMENT, INDEX_BACKOFF_MAX, INDEX_MAX_RETRIES, INDEX_TIMEOUT, LOADING_CHUNK_SIZE, ENABLE_GEO, GNAF_PACKAGE_URL, GNAF_DIR, ONE_DAY_S, ONE_DAY_MS, THIRTY_DAYS_MS, SERVER_PORT, CORS_ALLOW_ORIGIN, CORS_EXPOSE_HEADERS, CORS_ALLOW_HEADERS, CACHE_MAX_ENTRIES, CACHE_TTL_MS, CACHE_ENABLED, CIRCUIT_FAILURE_THRESHOLD, CIRCUIT_RESET_TIMEOUT_MS, CIRCUIT_SUCCESS_THRESHOLD, DYNAMIC_RESOURCES_ENABLED, TARGET_MEMORY_UTILIZATION, VERBOSE;
+var PAGE_SIZE, MAX_PAGE_SIZE, MAX_PAGE_NUMBER, ES_INDEX_NAME, ES_LOCALITY_INDEX_NAME, ES_CLEAR_INDEX, INDEX_BACKOFF_INITIAL, INDEX_BACKOFF_INCREMENT, INDEX_BACKOFF_MAX, INDEX_MAX_RETRIES, INDEX_TIMEOUT, LOADING_CHUNK_SIZE, ENABLE_GEO, GNAF_PACKAGE_URL, GNAF_DIR, ONE_DAY_S, ONE_DAY_MS, THIRTY_DAYS_MS, SERVER_PORT, CORS_ALLOW_ORIGIN, CORS_EXPOSE_HEADERS, CORS_ALLOW_HEADERS, CACHE_MAX_ENTRIES, CACHE_TTL_MS, CACHE_ENABLED, CIRCUIT_FAILURE_THRESHOLD, CIRCUIT_RESET_TIMEOUT_MS, CIRCUIT_SUCCESS_THRESHOLD, DYNAMIC_RESOURCES_ENABLED, TARGET_MEMORY_UTILIZATION, VERBOSE;
 var init_config = __esm({
   "apps/server/service/config.ts"() {
     "use strict";
@@ -35690,6 +35850,7 @@ var init_config = __esm({
     MAX_PAGE_SIZE = Number.parseInt(process.env.MAX_PAGE_SIZE ?? "100", 10) || 100;
     MAX_PAGE_NUMBER = Number.parseInt(process.env.MAX_PAGE_NUMBER ?? "1000", 10) || 1e3;
     ES_INDEX_NAME = process.env.ES_INDEX_NAME ?? "addresskit";
+    ES_LOCALITY_INDEX_NAME = process.env.ES_LOCALITY_INDEX_NAME ?? "addresskit-localities";
     ES_CLEAR_INDEX = process.env.ES_CLEAR_INDEX === "true";
     INDEX_BACKOFF_INITIAL = Number.parseInt(
       process.env.ADDRESSKIT_INDEX_BACKOFF ?? "30000",
@@ -37294,7 +37455,7 @@ var init_circuitBreaker = __esm({
 });
 
 // apps/server/service/helpers/jsonapi.ts
-var JSONAPI_IMPLEMENTATION, RESOURCE_TYPES, extractAddressId, buildAutocompleteResource, buildAddressResource, buildPaginationLinks, API_WARNINGS, buildPaginationMeta, buildAutocompleteDocument, buildAddressDetailDocument, buildError, buildErrorDocument, ErrorDocuments;
+var JSONAPI_IMPLEMENTATION, RESOURCE_TYPES, extractAddressId, extractLocalityId, buildAutocompleteResource, buildAddressResource, buildLocalityAutocompleteResource, buildLocalityResource, buildPaginationLinks, API_WARNINGS, buildPaginationMeta, buildAutocompleteDocument, buildAddressDetailDocument, buildLocalityAutocompleteDocument, buildLocalityDetailDocument, buildError, buildErrorDocument, ErrorDocuments;
 var init_jsonapi = __esm({
   "apps/server/service/helpers/jsonapi.ts"() {
     "use strict";
@@ -37305,10 +37466,17 @@ var init_jsonapi = __esm({
       /** Resource type for address entities */
       ADDRESS: "address",
       /** Resource type for autocomplete suggestions */
-      ADDRESS_SUGGESTION: "address-suggestion"
+      ADDRESS_SUGGESTION: "address-suggestion",
+      /** Resource type for locality entities */
+      LOCALITY: "locality",
+      /** Resource type for locality autocomplete suggestions */
+      LOCALITY_SUGGESTION: "locality-suggestion"
     };
     extractAddressId = (path5) => {
       return path5.replace(/^\/addresses\//, "");
+    };
+    extractLocalityId = (path5) => {
+      return path5.replace(/^\/localities\//, "");
     };
     buildAutocompleteResource = (id, sla, rank, ssla) => {
       const attributes = {
@@ -37332,6 +37500,30 @@ var init_jsonapi = __esm({
         attributes,
         links: {
           self: `/addresses/${id}`
+        }
+      };
+    };
+    buildLocalityAutocompleteResource = (id, display, rank) => {
+      const attributes = {
+        display,
+        rank
+      };
+      return {
+        type: RESOURCE_TYPES.LOCALITY_SUGGESTION,
+        id,
+        attributes,
+        links: {
+          self: `/localities/${id}`
+        }
+      };
+    };
+    buildLocalityResource = (id, attributes) => {
+      return {
+        type: RESOURCE_TYPES.LOCALITY,
+        id,
+        attributes,
+        links: {
+          self: `/localities/${id}`
         }
       };
     };
@@ -37373,7 +37565,11 @@ var init_jsonapi = __esm({
       /** Warning when the address dataset is empty (no addresses loaded) */
       EMPTY_DATASET: "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.",
       /** Warning when a search query returns no matching results */
-      NO_RESULTS: "No addresses matched your search query."
+      NO_RESULTS: "No addresses matched your search query.",
+      /** Warning when the locality dataset is empty (no localities loaded) */
+      EMPTY_LOCALITY_DATASET: "No localities are currently loaded in the dataset. Please run the data loader to populate the locality index.",
+      /** Warning when a locality search query returns no matching results */
+      NO_LOCALITY_RESULTS: "No localities matched your search query."
     };
     buildPaginationMeta = (total, page, pageSize2, responseTime, warning) => {
       const totalPages = Math.ceil(total / pageSize2);
@@ -37395,6 +37591,23 @@ var init_jsonapi = __esm({
       };
     };
     buildAddressDetailDocument = (resource) => {
+      return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resource,
+        links: {
+          self: resource.links?.self
+        }
+      };
+    };
+    buildLocalityAutocompleteDocument = (resources, links, meta) => {
+      return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resources,
+        links,
+        meta
+      };
+    };
+    buildLocalityDetailDocument = (resource) => {
       return {
         jsonapi: JSONAPI_IMPLEMENTATION,
         data: resource,
@@ -37547,7 +37760,7 @@ var init_helpers = __esm({
 });
 
 // apps/server/service/commands/load.ts
-var crypto, fs3, path3, stream, import_elasticsearch2, import_directory_exists, Papa2, unzip, fetchGNAFPackageData, fetchGNAFArchive, unzipGNAFArchive, computeDocumentHash, loadGNAFAddress, processAddressChunk, IndexingError, extractBulkErrors, isRetryableError, sendIndexRequest, getStateName, initGNAFDataLoader, loadStateData, loadStreetLocality, loadLocality, loadSiteGeo, loadDefaultGeo, loadAuthFiles, loadCommandEntry;
+var crypto, fs3, path3, stream, import_elasticsearch2, import_directory_exists, Papa2, unzip, fetchGNAFPackageData, fetchGNAFArchive, unzipGNAFArchive, computeDocumentHash, loadGNAFAddress, processAddressChunk, IndexingError, extractBulkErrors, isRetryableError, sendIndexRequest, getStateName, indexLocalitiesForState, initGNAFDataLoader, loadStateData, loadStreetLocality, loadLocality, loadSiteGeo, loadDefaultGeo, loadAuthFiles, loadCommandEntry;
 var init_load = __esm({
   "apps/server/service/commands/load.ts"() {
     "use strict";
@@ -38113,6 +38326,60 @@ var init_load = __esm({
         });
       });
     };
+    indexLocalitiesForState = async (context, addressDetailFile, refresh) => {
+      const localityPostcodes = {};
+      await new Promise((resolve2, reject) => {
+        Papa2.parse(fs3.createReadStream(addressDetailFile), {
+          header: true,
+          delimiter: "|",
+          chunk: (chunk, parser) => {
+            for (const row of chunk.data) {
+              const localityPid = row.LOCALITY_PID;
+              const postcode = row.POSTCODE;
+              if (!localityPid || !postcode) continue;
+              if (localityPostcodes[localityPid] === void 0) {
+                localityPostcodes[localityPid] = /* @__PURE__ */ new Set();
+              }
+              localityPostcodes[localityPid].add(postcode);
+            }
+          },
+          complete: () => resolve2(),
+          error: (parseError) => reject(parseError)
+        });
+      });
+      const localityIndexed = context.localityIndexed ?? {};
+      const state = context.state ?? "";
+      const stateName = context.stateName ?? "";
+      const localityClassCode = context.LOCALITY_CLASS_AUT ?? {};
+      const indexingBody = [];
+      for (const [localityPid, localityData] of Object.entries(localityIndexed)) {
+        const postcodes = localityPostcodes[localityPid] ? Array.from(localityPostcodes[localityPid]).sort() : [];
+        const primaryPostcode = postcodes[0] ?? "";
+        const classCode = localityData.LOCALITY_CLASS_CODE ?? "";
+        const className = localityClassCode[classCode]?.NAME ?? classCode ?? "";
+        const display = primaryPostcode ? `${localityData.LOCALITY_NAME} ${state} ${primaryPostcode}` : `${localityData.LOCALITY_NAME} ${state}`;
+        indexingBody.push({
+          index: {
+            _index: ES_LOCALITY_INDEX_NAME,
+            _id: `/localities/${localityPid}`
+          }
+        });
+        indexingBody.push({
+          display,
+          name: localityData.LOCALITY_NAME,
+          localityPid,
+          stateAbbreviation: state,
+          stateName,
+          postcode: primaryPostcode,
+          postcodes,
+          classCode,
+          className
+        });
+      }
+      if (indexingBody.length > 0) {
+        await sendIndexRequest(indexingBody, void 0, { refresh });
+      }
+    };
     initGNAFDataLoader = async (directory, { refresh = false } = {}) => {
       const countsFile = `${directory}/Counts.csv`;
       const countsFileExists = await fileExists(countsFile);
@@ -38135,6 +38402,7 @@ var init_load = __esm({
         loadContext
       );
       await (0, import_elasticsearch2.initIndex)(global.esClient, ES_CLEAR_INDEX, synonyms);
+      await (0, import_elasticsearch2.initLocalityIndex)(global.esClient, ES_CLEAR_INDEX);
       const addressDetailFiles = files.filter(
         (f) => f.match(/ADDRESS_DETAIL/) && f.match(/\/Standard\//)
       );
@@ -38245,6 +38513,17 @@ var init_load = __esm({
           const indexingDuration = Date.now() - indexingStartTime;
           succeedSpinner(
             `${stateProgress} ${formatState(state)}: ${formatNumber(expectedCount)} addresses indexed in ${formatDuration(indexingDuration)}`
+          );
+          const localitySpinner = startSpinner(
+            `${stateProgress} ${formatState(state)}: Indexing localities...`
+          );
+          await indexLocalitiesForState(
+            loadContext,
+            `${directory}/${detailFile}`,
+            refresh
+          );
+          succeedSpinner(
+            `${stateProgress} ${formatState(state)}: Localities indexed`
           );
         }
       }
@@ -39649,7 +39928,7 @@ var init_setLinkOptions = __esm({
 });
 
 // apps/server/service/index.ts
-var crypto2, fs4, import_node_https2, import_debug4, got, import_http_link_header, import_keyv, import_keyv_file, fsp, readdir, logger, error, cache, gnafHttpCache, keepAliveAgent, gotClient, validatePaginationParams, normalizeSearchString, isIndexEmpty, searchForAddress, getAddress, getAddresses, mapToJsonApiAutocompleteResponse, service_default;
+var crypto2, fs4, import_node_https2, import_debug4, got, import_http_link_header, import_keyv, import_keyv_file, fsp, readdir, logger, error, cache, gnafHttpCache, keepAliveAgent, gotClient, validatePaginationParams, normalizeSearchString, isIndexEmpty, searchForAddress, getAddress, getAddresses, mapToJsonApiAutocompleteResponse, isLocalityIndexEmpty, searchForLocality, getLocality, getLocalities, service_default;
 var init_service = __esm({
   "apps/server/service/index.ts"() {
     "use strict";
@@ -40095,10 +40374,361 @@ var init_service = __esm({
         );
       });
     };
+    isLocalityIndexEmpty = async () => {
+      try {
+        const circuit = getOpenSearchCircuit();
+        const countResponse = await circuit.execute(async () => {
+          return await global.esClient.count({
+            index: ES_LOCALITY_INDEX_NAME
+          });
+        });
+        return countResponse.body.count === 0;
+      } catch {
+        return true;
+      }
+    };
+    searchForLocality = async (searchString, p, pageSize2 = PAGE_SIZE) => {
+      const normalizedSearch = (searchString ?? "").trim().replace(/\s+/g, " ");
+      if (normalizedSearch === "") {
+        throw new Error("Search query must not be empty after normalization");
+      }
+      const safePage = Number.isFinite(p) ? p : 1;
+      const safeSize = Number.isFinite(pageSize2) ? pageSize2 : PAGE_SIZE;
+      const validPage = Math.max(1, Math.min(safePage, MAX_PAGE_NUMBER));
+      const validSize = Math.max(1, Math.min(safeSize, MAX_PAGE_SIZE));
+      const from = (validPage - 1) * validSize;
+      const circuit = getOpenSearchCircuit();
+      const searchResp = await circuit.execute(async () => {
+        return await global.esClient.search({
+          index: ES_LOCALITY_INDEX_NAME,
+          body: {
+            from,
+            size: validSize,
+            _source: [
+              "display",
+              "name",
+              "localityPid",
+              "stateAbbreviation",
+              "stateName",
+              "postcode",
+              "postcodes",
+              "classCode",
+              "className"
+            ],
+            query: {
+              bool: {
+                should: [
+                  // Highest boost: Display starts with the search query (exact prefix match)
+                  {
+                    prefix: {
+                      "display.raw": {
+                        value: normalizedSearch.toUpperCase(),
+                        boost: 100
+                      }
+                    }
+                  },
+                  // High boost: Locality name starts with search query
+                  {
+                    prefix: {
+                      "name.raw": {
+                        value: normalizedSearch.toUpperCase(),
+                        boost: 80
+                      }
+                    }
+                  },
+                  // Medium boost: Postcode match
+                  {
+                    term: {
+                      postcode: {
+                        value: normalizedSearch,
+                        boost: 60
+                      }
+                    }
+                  },
+                  // Medium boost: Match on any of the postcodes
+                  {
+                    term: {
+                      postcodes: {
+                        value: normalizedSearch,
+                        boost: 50
+                      }
+                    }
+                  },
+                  // Phrase prefix match on display
+                  {
+                    match_phrase_prefix: {
+                      display: {
+                        query: normalizedSearch,
+                        boost: 40
+                      }
+                    }
+                  },
+                  // Phrase prefix match on name
+                  {
+                    match_phrase_prefix: {
+                      name: {
+                        query: normalizedSearch,
+                        boost: 30
+                      }
+                    }
+                  },
+                  // Fuzzy match for typo tolerance
+                  {
+                    multi_match: {
+                      fields: ["display", "name"],
+                      query: normalizedSearch,
+                      fuzziness: "AUTO",
+                      type: "bool_prefix",
+                      lenient: true,
+                      operator: "AND"
+                    }
+                  }
+                ]
+              }
+            },
+            sort: ["_score", { "name.raw": { order: "asc" } }]
+          }
+        });
+      });
+      const rawTotal = searchResp.body.hits.total;
+      const totalHits = typeof rawTotal === "number" ? rawTotal : rawTotal.value;
+      return {
+        searchResponse: searchResp,
+        page: validPage,
+        size: validSize,
+        totalHits: totalHits ?? 0
+      };
+    };
+    getLocality = async (localityId) => {
+      try {
+        const circuit = getOpenSearchCircuit();
+        const jsonX = await circuit.execute(async () => {
+          return await global.esClient.get({
+            index: ES_LOCALITY_INDEX_NAME,
+            id: `/localities/${localityId}`
+          });
+        });
+        if (VERBOSE) logger("locality jsonX", jsonX);
+        const source = jsonX.body._source;
+        const attributes = {
+          localityPid: source.localityPid,
+          name: source.name,
+          display: source.display,
+          ...source.classCode !== void 0 && {
+            class: {
+              code: source.classCode,
+              name: source.className
+            }
+          },
+          ...source.stateAbbreviation !== void 0 && {
+            state: {
+              name: source.stateName,
+              abbreviation: source.stateAbbreviation
+            }
+          },
+          ...source.postcode !== void 0 && { postcode: source.postcode },
+          ...source.postcodes !== void 0 && {
+            postcodes: source.postcodes
+          }
+        };
+        const resource = buildLocalityResource(localityId, attributes);
+        const jsonApiDocument = buildLocalityDetailDocument(resource);
+        const link = new import_http_link_header.default();
+        link.set({
+          rel: "self",
+          uri: `/localities/${localityId}`
+        });
+        const hash = crypto2.createHash("md5").update(JSON.stringify(jsonApiDocument)).digest("hex");
+        return { link, json: jsonApiDocument, hash };
+      } catch (error_) {
+        if (error_ instanceof CircuitOpenError) {
+          error("Circuit breaker open for OpenSearch", error_);
+          const retryAfterSeconds = Math.ceil(error_.retryAfterMs / 1e3);
+          return {
+            statusCode: 503,
+            json: ErrorDocuments.serviceUnavailable(
+              retryAfterSeconds
+            )
+          };
+        }
+        const osError = error_;
+        error("error getting locality from elastic search", osError);
+        if (osError.body?.found === false) {
+          return {
+            statusCode: 404,
+            json: ErrorDocuments.notFound("locality", localityId)
+          };
+        }
+        if (osError.body?.error?.type === "index_not_found_exception") {
+          return {
+            statusCode: 503,
+            json: ErrorDocuments.serviceUnavailable()
+          };
+        }
+        return {
+          statusCode: 500,
+          json: ErrorDocuments.internalError()
+        };
+      }
+    };
+    getLocalities = async (url, swagger, q, p = 1) => {
+      try {
+        const normalizedQuery = (q ?? "").trim().replace(/\s+/g, " ");
+        if (normalizedQuery === "") {
+          return {
+            statusCode: 400,
+            json: ErrorDocuments.badRequest(
+              "The 'q' query parameter is required and must not be empty.",
+              "q"
+            )
+          };
+        }
+        const {
+          searchResponse: foundLocalities,
+          page,
+          size,
+          totalHits
+        } = await searchForLocality(normalizedQuery, p);
+        if (VERBOSE) logger("foundLocalities", foundLocalities);
+        const totalPages = Math.ceil(totalHits / size);
+        const maxScore = foundLocalities.body.hits.hits[0] ? foundLocalities.body.hits.hits[0]._score : 1;
+        const resources = foundLocalities.body.hits.hits.map((h) => {
+          const hit = h;
+          const localityId = extractLocalityId(hit._id);
+          const normalizedRank = maxScore > 0 ? hit._score / maxScore : 0;
+          return buildLocalityAutocompleteResource(
+            localityId,
+            hit._source.display,
+            normalizedRank
+          );
+        });
+        const jsonApiLinks = buildPaginationLinks(
+          url,
+          normalizedQuery,
+          page,
+          totalPages
+        );
+        jsonApiLinks.describedby = {
+          href: `/docs/#operations-${swagger.path.get["x-swagger-router-controller"].toLowerCase()}-${swagger.path.get.operationId}`,
+          title: `${swagger.path.get.operationId} API Docs`,
+          type: "text/html"
+        };
+        let warning;
+        if (totalHits === 0) {
+          const datasetEmpty = await isLocalityIndexEmpty();
+          warning = datasetEmpty ? API_WARNINGS.EMPTY_LOCALITY_DATASET : API_WARNINGS.NO_LOCALITY_RESULTS;
+        }
+        const meta = buildPaginationMeta(
+          totalHits,
+          page,
+          size,
+          void 0,
+          warning
+        );
+        const jsonApiDocument = buildLocalityAutocompleteDocument(
+          resources,
+          jsonApiLinks,
+          meta
+        );
+        const link = new import_http_link_header.default();
+        link.set({
+          rel: "describedby",
+          uri: `/docs/#operations-${swagger.path.get["x-swagger-router-controller"].toLowerCase()}-${swagger.path.get.operationId}`,
+          title: `${swagger.path.get.operationId} API Docs`,
+          type: "text/html"
+        });
+        const sp = new URLSearchParams({
+          ...normalizedQuery !== "" && { q: normalizedQuery },
+          ...page !== 1 && { "page[number]": String(page) }
+        });
+        const spString = sp.toString();
+        link.set({
+          rel: "self",
+          uri: `${url}${spString === "" ? "" : "?"}${spString}`
+        });
+        link.set({
+          rel: "first",
+          uri: `${url}${normalizedQuery === "" ? "" : "?"}${new URLSearchParams(
+            {
+              ...normalizedQuery !== "" && { q: normalizedQuery }
+            }
+          ).toString()}`
+        });
+        if (page > 1) {
+          link.set({
+            rel: "prev",
+            uri: `${url}${normalizedQuery === "" && page === 2 ? "" : "?"}${new URLSearchParams({
+              ...normalizedQuery !== "" && { q: normalizedQuery },
+              ...page > 2 && { "page[number]": String(page - 1) }
+            }).toString()}`
+          });
+        }
+        const hasNextPage = totalHits > size * page;
+        if (hasNextPage) {
+          link.set({
+            rel: "next",
+            uri: `${url}?${new URLSearchParams({
+              ...normalizedQuery !== "" && { q: normalizedQuery },
+              "page[number]": String(page + 1)
+            }).toString()}`
+          });
+        }
+        if (totalPages > 0) {
+          link.set({
+            rel: "last",
+            uri: `${url}?${new URLSearchParams({
+              ...normalizedQuery !== "" && { q: normalizedQuery },
+              ...totalPages > 1 && {
+                "page[number]": String(totalPages)
+              }
+            }).toString()}`
+          });
+        }
+        const linkTemplate = new import_http_link_header.default();
+        const op = swagger.path.get;
+        setLinkOptions(op, url, linkTemplate);
+        return {
+          link,
+          json: jsonApiDocument,
+          linkTemplate
+        };
+      } catch (error_) {
+        if (error_ instanceof CircuitOpenError) {
+          error("Circuit breaker open for OpenSearch", error_);
+          const retryAfterSeconds = Math.ceil(error_.retryAfterMs / 1e3);
+          return {
+            statusCode: 503,
+            json: ErrorDocuments.serviceUnavailable(
+              retryAfterSeconds
+            )
+          };
+        }
+        const osError = error_;
+        error("error querying localities in elastic search", osError);
+        if (osError.body?.error?.type === "index_not_found_exception") {
+          return {
+            statusCode: 503,
+            json: ErrorDocuments.serviceUnavailable()
+          };
+        }
+        if (osError.displayName === "RequestTimeout") {
+          return {
+            statusCode: 504,
+            json: ErrorDocuments.gatewayTimeout()
+          };
+        }
+        return {
+          statusCode: 500,
+          json: ErrorDocuments.internalError()
+        };
+      }
+    };
     service_default = {
       load: loadCommandEntry,
       autocomplete: getAddresses,
-      lookup: getAddress
+      lookup: getAddress,
+      localityAutocomplete: getLocalities,
+      localityLookup: getLocality
     };
   }
 });

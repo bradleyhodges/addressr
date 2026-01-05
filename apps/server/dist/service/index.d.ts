@@ -113,6 +113,32 @@ declare const mapToJsonApiAutocompleteResponse: (foundAddresses: Types.Opensearc
  */
 declare const mapToSearchAddressResponse: (foundAddresses: Types.OpensearchApiResponse<Types.OpensearchSearchResponse<unknown>, unknown>) => Types.AddressSearchResult[];
 /**
+ * Searches for localities matching a query string.
+ *
+ * @param searchString - The search string to match against localities.
+ * @param p - The page number (1-indexed).
+ * @param pageSize - The page size.
+ * @returns A promise resolving to the OpenSearch search response with pagination metadata.
+ */
+declare const searchForLocality: (searchString: string, p: number | undefined, pageSize?: number | undefined) => Promise<Types.SearchForAddressResult>;
+/**
+ * Retrieves detailed information about a specific locality by its ID.
+ *
+ * @param localityId - The unique identifier for the locality (G-NAF Locality PID).
+ * @returns A promise resolving to the locality response.
+ */
+declare const getLocality: (localityId: string) => Promise<Types.GetAddressResponse>;
+/**
+ * Searches for localities matching a query string with pagination support.
+ *
+ * @param url - The base URL for the localities endpoint.
+ * @param swagger - Swagger/OpenAPI context for API documentation linkage.
+ * @param q - The search query string for locality matching.
+ * @param p - The page number for pagination (1-indexed).
+ * @returns A promise resolving to the localities response.
+ */
+declare const getLocalities: (url: string, swagger: Types.SwaggerContext, q?: string, p?: number) => Promise<Types.GetAddressesResponse>;
+/**
  * The default export for the service. These are the commands that can be used to interact with the service.
  */
 declare const _default: {
@@ -121,10 +147,12 @@ declare const _default: {
     }) => Promise<void>;
     autocomplete: (url: string, swagger: Types.SwaggerContext, q?: string, p?: number) => Promise<Types.GetAddressesResponse>;
     lookup: (addressId: string) => Promise<Types.GetAddressResponse>;
+    localityAutocomplete: (url: string, swagger: Types.SwaggerContext, q?: string, p?: number) => Promise<Types.GetAddressesResponse>;
+    localityLookup: (localityId: string) => Promise<Types.GetAddressResponse>;
 };
 export default _default;
 /**
  * Named exports for direct function access (useful for testing and controllers).
  */
-export { getAddress, getAddresses, mapToSearchAddressResponse, mapToJsonApiAutocompleteResponse, setAddresses, searchForAddress, };
+export { getAddress, getAddresses, getLocality, getLocalities, mapToSearchAddressResponse, mapToJsonApiAutocompleteResponse, setAddresses, searchForAddress, searchForLocality, };
 //# sourceMappingURL=index.d.ts.map

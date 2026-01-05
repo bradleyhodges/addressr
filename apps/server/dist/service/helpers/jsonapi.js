@@ -7,7 +7,7 @@
  * across all endpoints.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.JSONAPI_CONTENT_TYPE = exports.ErrorDocuments = exports.buildErrorDocument = exports.buildError = exports.buildAddressDetailDocument = exports.buildAutocompleteDocument = exports.buildPaginationMeta = exports.API_WARNINGS = exports.buildPaginationLinks = exports.buildAddressResource = exports.buildAutocompleteResource = exports.extractAddressId = exports.RESOURCE_TYPES = void 0;
+exports.JSONAPI_CONTENT_TYPE = exports.ErrorDocuments = exports.buildErrorDocument = exports.buildError = exports.buildLocalityDetailDocument = exports.buildLocalityAutocompleteDocument = exports.buildAddressDetailDocument = exports.buildAutocompleteDocument = exports.buildPaginationMeta = exports.API_WARNINGS = exports.buildPaginationLinks = exports.buildLocalityResource = exports.buildLocalityAutocompleteResource = exports.buildAddressResource = exports.buildAutocompleteResource = exports.extractLocalityId = exports.extractAddressId = exports.RESOURCE_TYPES = void 0;
 /**
  * Current JSON:API implementation information for AddressKit.
  */
@@ -22,6 +22,10 @@ exports.RESOURCE_TYPES = {
     ADDRESS: "address",
     /** Resource type for autocomplete suggestions */
     ADDRESS_SUGGESTION: "address-suggestion",
+    /** Resource type for locality entities */
+    LOCALITY: "locality",
+    /** Resource type for locality autocomplete suggestions */
+    LOCALITY_SUGGESTION: "locality-suggestion",
 };
 /**
  * Extracts the address ID from a full resource path.
@@ -34,6 +38,17 @@ const extractAddressId = (path) => {
     return path.replace(/^\/addresses\//, "");
 };
 exports.extractAddressId = extractAddressId;
+/**
+ * Extracts the locality ID from a full resource path.
+ * Converts "/localities/NSW1234" to "NSW1234".
+ *
+ * @param path - Full path including the resource prefix.
+ * @returns The extracted locality ID.
+ */
+const extractLocalityId = (path) => {
+    return path.replace(/^\/localities\//, "");
+};
+exports.extractLocalityId = extractLocalityId;
 /**
  * Builds a JSON:API resource object for an autocomplete suggestion.
  *
@@ -78,6 +93,48 @@ const buildAddressResource = (id, attributes) => {
     };
 };
 exports.buildAddressResource = buildAddressResource;
+/**
+ * Builds a JSON:API resource object for a locality autocomplete suggestion.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param display - Display string for the locality (e.g., "SYDNEY NSW 2000").
+ * @param rank - Search relevance score (0-1 normalized).
+ * @returns A JSON:API resource object for the locality autocomplete result.
+ */
+const buildLocalityAutocompleteResource = (id, display, rank) => {
+    // Construct the attributes object
+    const attributes = {
+        display,
+        rank,
+    };
+    return {
+        type: exports.RESOURCE_TYPES.LOCALITY_SUGGESTION,
+        id,
+        attributes,
+        links: {
+            self: `/localities/${id}`,
+        },
+    };
+};
+exports.buildLocalityAutocompleteResource = buildLocalityAutocompleteResource;
+/**
+ * Builds a JSON:API resource object for a detailed locality.
+ *
+ * @param id - Unique identifier for the locality (G-NAF Locality PID).
+ * @param attributes - Complete locality attributes including state and postcodes.
+ * @returns A JSON:API resource object for the locality.
+ */
+const buildLocalityResource = (id, attributes) => {
+    return {
+        type: exports.RESOURCE_TYPES.LOCALITY,
+        id,
+        attributes,
+        links: {
+            self: `/localities/${id}`,
+        },
+    };
+};
+exports.buildLocalityResource = buildLocalityResource;
 /**
  * Builds pagination links for a collection response.
  *
@@ -137,6 +194,10 @@ exports.API_WARNINGS = {
     EMPTY_DATASET: "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.",
     /** Warning when a search query returns no matching results */
     NO_RESULTS: "No addresses matched your search query.",
+    /** Warning when the locality dataset is empty (no localities loaded) */
+    EMPTY_LOCALITY_DATASET: "No localities are currently loaded in the dataset. Please run the data loader to populate the locality index.",
+    /** Warning when a locality search query returns no matching results */
+    NO_LOCALITY_RESULTS: "No localities matched your search query.",
 };
 /**
  * Builds metadata for a paginated collection response.
@@ -193,6 +254,39 @@ const buildAddressDetailDocument = (resource) => {
     };
 };
 exports.buildAddressDetailDocument = buildAddressDetailDocument;
+/**
+ * Builds a complete JSON:API document for locality autocomplete responses.
+ *
+ * @param resources - Array of locality autocomplete resource objects.
+ * @param links - Pagination and navigation links.
+ * @param meta - Response metadata including pagination info.
+ * @returns Complete JSON:API document for locality autocomplete results.
+ */
+const buildLocalityAutocompleteDocument = (resources, links, meta) => {
+    return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resources,
+        links,
+        meta,
+    };
+};
+exports.buildLocalityAutocompleteDocument = buildLocalityAutocompleteDocument;
+/**
+ * Builds a complete JSON:API document for a single locality detail response.
+ *
+ * @param resource - The locality resource object.
+ * @returns Complete JSON:API document for the locality.
+ */
+const buildLocalityDetailDocument = (resource) => {
+    return {
+        jsonapi: JSONAPI_IMPLEMENTATION,
+        data: resource,
+        links: {
+            self: resource.links?.self,
+        },
+    };
+};
+exports.buildLocalityDetailDocument = buildLocalityDetailDocument;
 /**
  * Builds a JSON:API error object.
  *
