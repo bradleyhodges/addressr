@@ -23,7 +23,9 @@ import {
     ES_INDEX_NAME,
     ES_LOCALITY_INDEX_NAME,
     GNAF_DIR,
+    GNAF_MIRROR_URL,
     GNAF_PACKAGE_URL,
+    GNAF_USE_MIRROR,
     INDEX_BACKOFF_INCREMENT,
     INDEX_BACKOFF_INITIAL,
     INDEX_BACKOFF_MAX,
@@ -66,19 +68,43 @@ import { cache, error, fsp, gotClient, logger } from "../index";
 import type * as Types from "../types/index";
 
 /**
- * Fetches the GNAF package data from the cache (if fresh enough content exists) or from the network.
+ * Tracks which source was used for the package data (for logging).
+ */
+let lastPackageSource: "mirror" | "upstream" | "cache" = "cache";
+
+/**
+ * Gets the source used for the last package fetch.
+ *
+ * @returns The source used: "mirror", "upstream", or "cache".
+ */
+export const getLastPackageSource = (): string => lastPackageSource;
+
+/**
+ * Fetches the GNAF package data from the AddressKit mirror with fallback to data.gov.au.
+ *
+ * This function implements a multi-tier fetching strategy:
+ * 1. Check local cache (if fresh, use cached data)
+ * 2. Try AddressKit CDN mirror (https://dl.addresskit.com.au) for fast, reliable downloads
+ * 3. Fall back to data.gov.au if mirror is unavailable
+ * 4. Use stale cache as last resort if all network requests fail
+ *
+ * The mirror is preferred because:
+ * - Faster downloads via Cloudflare CDN
+ * - More reliable than direct government server connections
+ * - Retry logic handled at the CDN level
  *
  * @alias fetchPackageData
  *
  * @returns {Promise<got.Response<string>>} The GNAF package data.
- * @throws {Error} If the GNAF package data cannot be fetched.
+ * @throws {Error} If the GNAF package data cannot be fetched from any source.
  */
 const fetchGNAFPackageData = async (): Promise<got.Response<string>> => {
-    // Get the GNAF package URL
-    const packageUrl = GNAF_PACKAGE_URL;
+    // Get the primary and fallback URLs
+    const mirrorUrl = GNAF_MIRROR_URL;
+    const upstreamUrl = GNAF_PACKAGE_URL;
 
-    // See if we have the value in cache
-    const cachedResponse = await cache.get(packageUrl);
+    // See if we have the value in cache (use upstream URL as cache key for consistency)
+    const cachedResponse = await cache.get(upstreamUrl);
     if (VERBOSE) logger("cached gnaf package data", cachedResponse);
 
     // Get the age of the cached response
@@ -99,48 +125,134 @@ const fetchGNAFPackageData = async (): Promise<got.Response<string>> => {
 
         // If the age is less than or equal to one day, return the cached response
         if (age <= ONE_DAY_MS) {
+            lastPackageSource = "cache";
             return cachedResponse as unknown as got.Response<string>;
         }
     }
 
     // cached value was older than one day, so go fetch
-    try {
-        // Fetch the GNAF package data
-        const response = await gotClient.get(packageUrl);
-        if (VERBOSE) logger("response.isFromCache", response.fromCache);
-        if (VERBOSE)
-            logger("fresh gnaf package data", {
-                body: response.body,
-                headers: response.headers,
+    // Try mirror first if enabled, then fall back to upstream
+    const sources = GNAF_USE_MIRROR
+        ? [
+              { url: mirrorUrl, name: "mirror" as const, isMirror: true },
+              { url: upstreamUrl, name: "upstream" as const, isMirror: false },
+          ]
+        : [{ url: upstreamUrl, name: "upstream" as const, isMirror: false }];
+
+    let lastError: Error | undefined;
+
+    for (const source of sources) {
+        try {
+            if (VERBOSE) logger(`Trying ${source.name}: ${source.url}`);
+
+            // Fetch the GNAF package data
+            const response = await gotClient.get(source.url, {
+                timeout: { request: 30000 }, // 30 second timeout
             });
 
-        // Set the cache response
-        await cache.set(packageUrl, {
-            body: response.body,
-            headers: response.headers,
-            cachedAt: Date.now(),
-        });
+            if (VERBOSE) logger("response.isFromCache", response.fromCache);
 
-        // Set the cache header to MISS
-        response.headers["x-cache"] = response.fromCache ? "HIT" : "MISS";
+            // Parse the response body
+            let packageData: {
+                original_package?: { body?: string };
+                body?: string;
+            };
+            try {
+                packageData = JSON.parse(response.body);
+            } catch {
+                throw new Error(`Invalid JSON response from ${source.name}`);
+            }
 
-        // Return the response
-        return response as got.Response<string>;
-    } catch (error_) {
-        // We were unable to fetch. If we have cached value that isn't stale, return in
-        if (cachedResponse !== undefined) {
-            // If the age is less than 30 days, return the cached response
-            if (age < THIRTY_DAYS_MS) {
-                // Set the cache header to STALE
-                cachedResponse.headers.warning =
-                    '110	custom/1.0 "Response is Stale"';
-                return cachedResponse;
+            // If this is the mirror, extract the original_package data
+            // The mirror config wraps the package_show response
+            let finalBody: string;
+            if (source.isMirror && packageData.original_package) {
+                // Mirror returns { original_package: { result: { resources: [...] }, ... } }
+                finalBody = JSON.stringify(packageData.original_package);
+                logInfo(
+                    `Using AddressKit CDN mirror (synced: ${(packageData as { synced_at?: string }).synced_at ?? "unknown"})`,
+                );
+            } else {
+                // Direct response from data.gov.au
+                finalBody = response.body;
+                if (source.name === "upstream" && sources.length > 1) {
+                    logWarning(
+                        "Mirror unavailable, using data.gov.au directly",
+                    );
+                }
+            }
+
+            // Verify the response has the expected structure
+            const parsed = JSON.parse(finalBody);
+            if (!parsed.success || !parsed.result?.resources) {
+                throw new Error(
+                    `Invalid package data structure from ${source.name}`,
+                );
+            }
+
+            if (VERBOSE)
+                logger("fresh gnaf package data", {
+                    body: `${finalBody.slice(0, 500)}...`,
+                    source: source.name,
+                });
+
+            // Set the cache response (use upstream URL as cache key)
+            await cache.set(upstreamUrl, {
+                body: finalBody,
+                headers: response.headers,
+                cachedAt: Date.now(),
+            });
+
+            // Set the cache header
+            response.headers["x-cache"] = response.fromCache ? "HIT" : "MISS";
+            response.headers["x-source"] = source.name;
+
+            // Track the source
+            lastPackageSource = source.name;
+
+            // Create a synthetic response with the correct body
+            const syntheticResponse = {
+                ...response,
+                body: finalBody,
+            } as got.Response<string>;
+
+            return syntheticResponse;
+        } catch (error_) {
+            lastError = error_ as Error;
+            if (VERBOSE)
+                logger(
+                    `Failed to fetch from ${source.name}: ${lastError.message}`,
+                );
+
+            // If this isn't the last source, log and continue to next source
+            if (source !== sources[sources.length - 1]) {
+                logWarning(
+                    `${source.name === "mirror" ? "Mirror" : "Upstream"} fetch failed, trying ${source.name === "mirror" ? "upstream" : "next source"}...`,
+                );
             }
         }
-
-        // Otherwise, throw the original network error
-        throw error_;
     }
+
+    // All sources failed - try to use stale cache as last resort
+    if (cachedResponse !== undefined) {
+        // If the age is less than 30 days, return the cached response
+        if (age < THIRTY_DAYS_MS) {
+            logWarning(
+                "All sources failed, using stale cached data (may be outdated)",
+            );
+            // Set the cache header to STALE
+            cachedResponse.headers.warning =
+                '110	custom/1.0 "Response is Stale"';
+            lastPackageSource = "cache";
+            return cachedResponse;
+        }
+    }
+
+    // Otherwise, throw the last network error
+    throw (
+        lastError ??
+        new Error("Failed to fetch GNAF package data from any source")
+    );
 };
 
 /**

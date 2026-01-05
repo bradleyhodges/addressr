@@ -1,5 +1,11 @@
 import type * as Types from "../types/index";
 /**
+ * Gets the source used for the last package fetch.
+ *
+ * @returns The source used: "mirror", "upstream", or "cache".
+ */
+export declare const getLastPackageSource: () => string;
+/**
  * Custom error class for indexing failures with context about retry attempts.
  *
  * This error includes detailed information about the failure to aid debugging

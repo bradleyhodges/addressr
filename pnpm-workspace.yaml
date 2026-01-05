@@ -1,13 +1,17 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "tooling/*"
+  - apps/*
+  - packages/*
+  - tooling/*
+  - infra/cloudflare/*
 
 onlyBuiltDependencies:
   - '@biomejs/biome'
   - core-js
   - es5-ext
+  - esbuild
   - gifsicle
   - jpegtran-bin
   - ngrok
   - optipng-bin
+  - sharp
+  - workerd

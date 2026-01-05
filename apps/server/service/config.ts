@@ -163,8 +163,20 @@ export const ENABLE_GEO = !!process.env.ADDRESSKIT_ENABLE_GEO;
 // ---------------------------------------------------------------------------------
 
 /**
+ * URL to the AddressKit G-NAF mirror configuration.
+ * This CDN-powered mirror provides faster and more reliable downloads.
+ * Falls back to data.gov.au if the mirror is unavailable.
+ *
+ * @default "https://dl.addresskit.com.au/package_show.conf.json"
+ * @env GNAF_MIRROR_URL
+ */
+export const GNAF_MIRROR_URL =
+    process.env.GNAF_MIRROR_URL ??
+    "https://dl.addresskit.com.au/package_show.conf.json";
+
+/**
  * URL to the G-NAF package metadata on data.gov.au.
- * Used to discover the latest G-NAF download URL.
+ * Used as fallback when the mirror is unavailable.
  *
  * @default "https://data.gov.au/api/3/action/package_show?id=19432f89-dc3a-4ef3-b943-5326ef1dbecc"
  * @env GNAF_PACKAGE_URL
@@ -172,6 +184,16 @@ export const ENABLE_GEO = !!process.env.ADDRESSKIT_ENABLE_GEO;
 export const GNAF_PACKAGE_URL =
     process.env.GNAF_PACKAGE_URL ??
     "https://data.gov.au/api/3/action/package_show?id=19432f89-dc3a-4ef3-b943-5326ef1dbecc";
+
+/**
+ * Whether to use the AddressKit mirror as the primary download source.
+ * When enabled, downloads are faster and more reliable via CDN.
+ * Falls back to data.gov.au automatically if mirror is unavailable.
+ *
+ * @default true
+ * @env GNAF_USE_MIRROR
+ */
+export const GNAF_USE_MIRROR = process.env.GNAF_USE_MIRROR !== "false";
 
 /**
  * Local directory for storing downloaded G-NAF data files.
