@@ -7,7 +7,7 @@
  * across all endpoints.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.JSONAPI_CONTENT_TYPE = exports.ErrorDocuments = exports.buildErrorDocument = exports.buildError = exports.buildAddressDetailDocument = exports.buildAutocompleteDocument = exports.buildPaginationMeta = exports.buildPaginationLinks = exports.buildAddressResource = exports.buildAutocompleteResource = exports.extractAddressId = exports.RESOURCE_TYPES = void 0;
+exports.JSONAPI_CONTENT_TYPE = exports.ErrorDocuments = exports.buildErrorDocument = exports.buildError = exports.buildAddressDetailDocument = exports.buildAutocompleteDocument = exports.buildPaginationMeta = exports.API_WARNINGS = exports.buildPaginationLinks = exports.buildAddressResource = exports.buildAutocompleteResource = exports.extractAddressId = exports.RESOURCE_TYPES = void 0;
 /**
  * Current JSON:API implementation information for AddressKit.
  */
@@ -130,15 +130,25 @@ const buildPaginationLinks = (baseUrl, query, currentPage, totalPages, pageSize)
 };
 exports.buildPaginationLinks = buildPaginationLinks;
 /**
+ * Warning message constants for API responses.
+ */
+exports.API_WARNINGS = {
+    /** Warning when the address dataset is empty (no addresses loaded) */
+    EMPTY_DATASET: "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.",
+    /** Warning when a search query returns no matching results */
+    NO_RESULTS: "No addresses matched your search query.",
+};
+/**
  * Builds metadata for a paginated collection response.
  *
  * @param total - Total number of resources matching the query.
  * @param page - Current page number (1-indexed).
  * @param pageSize - Number of items per page.
  * @param responseTime - Optional query processing time in milliseconds.
+ * @param warning - Optional warning message to include in meta.
  * @returns JSON:API meta object with pagination information.
  */
-const buildPaginationMeta = (total, page, pageSize, responseTime) => {
+const buildPaginationMeta = (total, page, pageSize, responseTime, warning) => {
     const totalPages = Math.ceil(total / pageSize);
     return {
         total,
@@ -146,6 +156,7 @@ const buildPaginationMeta = (total, page, pageSize, responseTime) => {
         pageSize,
         totalPages,
         ...(responseTime !== undefined && { responseTime }),
+        ...(warning !== undefined && { warning }),
     };
 };
 exports.buildPaginationMeta = buildPaginationMeta;
@@ -231,6 +242,17 @@ exports.ErrorDocuments = {
     badRequest: (detail, paramName) => {
         return (0, exports.buildErrorDocument)([
             (0, exports.buildError)("400", "Bad Request", detail, "INVALID_REQUEST", paramName ? { parameter: paramName } : undefined),
+        ]);
+    },
+    /**
+     * Builds a 400 Bad Request error document for missing required parameter.
+     *
+     * @param paramName - The name of the missing required parameter.
+     * @returns JSON:API error document for missing parameter.
+     */
+    missingRequiredParameter: (paramName) => {
+        return (0, exports.buildErrorDocument)([
+            (0, exports.buildError)("400", "Bad Request", `The '${paramName}' query parameter is required and must not be empty.`, "MISSING_REQUIRED_PARAMETER", { parameter: paramName }),
         ]);
     },
     /**

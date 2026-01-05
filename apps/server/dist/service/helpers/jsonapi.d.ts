@@ -53,15 +53,25 @@ export declare const buildAddressResource: (id: string, attributes: AddressDetai
  */
 export declare const buildPaginationLinks: (baseUrl: string, query: string, currentPage: number, totalPages: number, pageSize?: number) => JsonApiLinks;
 /**
+ * Warning message constants for API responses.
+ */
+export declare const API_WARNINGS: {
+    /** Warning when the address dataset is empty (no addresses loaded) */
+    readonly EMPTY_DATASET: "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.";
+    /** Warning when a search query returns no matching results */
+    readonly NO_RESULTS: "No addresses matched your search query.";
+};
+/**
  * Builds metadata for a paginated collection response.
  *
  * @param total - Total number of resources matching the query.
  * @param page - Current page number (1-indexed).
  * @param pageSize - Number of items per page.
  * @param responseTime - Optional query processing time in milliseconds.
+ * @param warning - Optional warning message to include in meta.
  * @returns JSON:API meta object with pagination information.
  */
-export declare const buildPaginationMeta: (total: number, page: number, pageSize: number, responseTime?: number) => JsonApiMeta;
+export declare const buildPaginationMeta: (total: number, page: number, pageSize: number, responseTime?: number, warning?: string) => JsonApiMeta;
 /**
  * Builds a complete JSON:API document for autocomplete responses.
  *
@@ -109,6 +119,13 @@ export declare const ErrorDocuments: {
      * @returns JSON:API error document for bad request.
      */
     badRequest: (detail: string, paramName?: string) => JsonApiErrorDocument;
+    /**
+     * Builds a 400 Bad Request error document for missing required parameter.
+     *
+     * @param paramName - The name of the missing required parameter.
+     * @returns JSON:API error document for missing parameter.
+     */
+    missingRequiredParameter: (paramName: string) => JsonApiErrorDocument;
     /**
      * Builds a 404 Not Found error document.
      *

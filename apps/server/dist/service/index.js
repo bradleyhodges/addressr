@@ -153,6 +153,29 @@ const validatePaginationParams = (page, size) => {
  */
 const normalizeSearchString = (searchString) => (searchString ?? "").trim().replace(/\s+/g, " ");
 /**
+ * Checks if the address index is empty (contains no documents).
+ *
+ * This function queries OpenSearch for the total document count in the address
+ * index. Used to provide helpful warnings when users query an empty dataset.
+ *
+ * @returns A promise resolving to true if the index is empty or doesn't exist, false otherwise.
+ */
+const isIndexEmpty = async () => {
+    try {
+        const circuit = (0, helpers_1.getOpenSearchCircuit)();
+        const countResponse = await circuit.execute(async () => {
+            return await global.esClient.count({
+                index: conf_1.ES_INDEX_NAME,
+            });
+        });
+        return countResponse.body.count === 0;
+    }
+    catch {
+        // If we can't determine the count (index not found, etc.), assume empty
+        return true;
+    }
+};
+/**
  * Searches for an address in the index with fuzzy matching.
  *
  * This function performs a multi-match query against the SLA and SSLA fields
@@ -485,8 +508,17 @@ const getAddresses = async (url, swagger, q, p = 1) => {
             title: `${swagger.path.get.operationId} API Docs`,
             type: "text/html",
         };
-        // Build JSON:API pagination metadata
-        const meta = (0, helpers_1.buildPaginationMeta)(totalHits, page, size);
+        // Determine if a warning should be included in the response
+        let warning;
+        if (totalHits === 0) {
+            // Check if the entire dataset is empty vs. just no results for this query
+            const datasetEmpty = await isIndexEmpty();
+            warning = datasetEmpty
+                ? helpers_1.API_WARNINGS.EMPTY_DATASET
+                : helpers_1.API_WARNINGS.NO_RESULTS;
+        }
+        // Build JSON:API pagination metadata (with optional warning)
+        const meta = (0, helpers_1.buildPaginationMeta)(totalHits, page, size, undefined, warning);
         // Build the complete JSON:API document
         const jsonApiDocument = (0, helpers_1.buildAutocompleteDocument)(resources, jsonApiLinks, meta);
         if (config_1.VERBOSE)

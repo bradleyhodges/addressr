@@ -45,9 +45,13 @@ async function runLoadCommand(options) {
         (0, terminalUI_1.displayKeyValue)({
             "OpenSearch URL": process.env.ES_HOST || "http://localhost:9200",
             "Index Name": process.env.ES_INDEX_NAME || "addresskit",
-            "Clear Index": options.clear ? "Yes" : "No",
-            Geocoding: options.geo ? "Enabled" : "Disabled",
-            States: options.states || "All",
+            "Clear Index": process.env.ES_CLEAR_INDEX === "true" || options.clear
+                ? "Yes"
+                : "No",
+            Geocoding: process.env.ADDRESSKIT_ENABLE_GEO === "1" || options.geo
+                ? "Enabled"
+                : "Disabled",
+            States: process.env.COVERED_STATES || options.states || "All",
         });
     }
     // Connect to OpenSearch

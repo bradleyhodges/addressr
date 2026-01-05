@@ -84,11 +84,12 @@ program
     // Set daemon mode based on CLI flag
     (0, terminalUI_1.setDaemonMode)(options.daemon);
     // Set environment variables based on options
+    // CLI options take precedence over environment variables
     if (options.states) {
         process.env.COVERED_STATES = options.states;
     }
     if (options.clear) {
-        process.env.ES_CLEAR_INDEX = "1";
+        process.env.ES_CLEAR_INDEX = "true";
     }
     if (options.geo) {
         process.env.ADDRESSKIT_ENABLE_GEO = "1";

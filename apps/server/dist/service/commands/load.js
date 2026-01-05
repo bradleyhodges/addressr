@@ -44,7 +44,6 @@ const stream = __importStar(require("node:stream"));
 const elasticsearch_1 = require("@repo/addresskit-client/elasticsearch");
 const stream_down_1 = __importDefault(require("@repo/addresskit-core/utils/stream-down"));
 const directory_exists_1 = __importDefault(require("directory-exists"));
-const glob_promise_1 = require("glob-promise");
 const Papa = __importStar(require("papaparse"));
 const unzip = __importStar(require("unzip-stream"));
 const conf_1 = require("../conf");
@@ -1431,18 +1430,50 @@ const loadCommandEntry = async ({ refresh = false, } = {}) => {
             throw new Error(`Data dir '${unzipped}' is empty`);
         }
         // Step 4: Find the G-NAF subdirectory within the extracted contents
+        // Using native fs methods for reliable bundled execution (glob-promise has bundling issues)
         const locateSpinner = (0, helpers_1.startSpinner)("Locating G-NAF data directory...");
-        const gnafDir = await (0, glob_promise_1.glob)("**/G-NAF/", { cwd: unzipped });
+        /**
+         * Recursively finds a directory by name within a base directory.
+         *
+         * @param baseDir - The base directory to search in.
+         * @param targetName - The name of the directory to find.
+         * @param maxDepth - Maximum depth to search (default 3).
+         * @returns The relative path to the found directory, or undefined if not found.
+         */
+        const findDirectory = async (baseDir, targetName, maxDepth = 3) => {
+            const searchDir = async (currentDir, depth) => {
+                if (depth > maxDepth)
+                    return undefined;
+                const entries = await index_1.fsp.readdir(currentDir, {
+                    withFileTypes: true,
+                });
+                for (const entry of entries) {
+                    if (entry.isDirectory()) {
+                        if (entry.name === targetName) {
+                            // Return relative path from baseDir
+                            return path.relative(baseDir, path.join(currentDir, entry.name));
+                        }
+                        // Recurse into subdirectories
+                        const found = await searchDir(path.join(currentDir, entry.name), depth + 1);
+                        if (found)
+                            return found;
+                    }
+                }
+                return undefined;
+            };
+            return searchDir(baseDir, 0);
+        };
+        const gnafDirPath = await findDirectory(unzipped, "G-NAF");
         if (config_1.VERBOSE)
-            (0, index_1.logger)("gnafDir", gnafDir);
+            (0, index_1.logger)("gnafDir found", gnafDirPath);
         // Verify the G-NAF directory was found
-        if (gnafDir.length === 0) {
+        if (!gnafDirPath) {
             (0, helpers_1.failSpinner)("G-NAF directory not found");
             throw new Error(`Cannot find 'G-NAF' directory in Data dir '${unzipped}'`);
         }
         (0, helpers_1.succeedSpinner)("G-NAF data directory located");
         // Get the parent directory of the G-NAF folder (this is the main data directory)
-        const mainDirectory = path.dirname(`${unzipped}/${gnafDir[0].slice(0, -1)}`);
+        const mainDirectory = path.dirname(`${unzipped}/${gnafDirPath}`);
         if (config_1.VERBOSE)
             (0, index_1.logger)("Main Data dir", mainDirectory);
         // Log resource state before the intensive loading phase

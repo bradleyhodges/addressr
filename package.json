@@ -1,6 +1,6 @@
 {
     "name": "@bradleyhodges/addresskit",
-    "version": "2.2.5",
+    "version": "2.3.0",
     "description": "Scalable address ingestion, validation, search, and autocomplete engine for Australian addresses",
     "config": {
         "SEARCH_IMAGE": "opensearchproject/opensearch:1.3.20"
@@ -21,7 +21,7 @@
         "release:all": "node tooling/scripts/release.js",
         "dev": "turbo run dev --parallel --filter=!@bradleyhodges/addresskit",
         "dev:docker": "docker compose -f infra/docker/compose.dev.yml up -d",
-        "dev:docker:down": "docker compose -f infra/docker/compose.dev.yml down",
+        "dev:docker:down": "docker compose -f infra/docker/compose.dev.yml down --volumes --remove-orphans --rmi all",
         "dev:docker:load": "docker compose -f infra/docker/compose.dev.yml run --rm loader",
         "smoke": "node tooling/smoke/smoke.mjs",
         "format": "biome check . --write --skip-errors",
