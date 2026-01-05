@@ -227,8 +227,8 @@ function attemptDownload(opts, existingSize, retryAttempt) {
     // Resolve the destination path to a file name
     const resolvedDestination = opts.destinationPath ?? path.basename(uri.pathname ?? opts.url);
     // Timeout configuration with defaults
-    const socketTimeout = opts.timeout?.socketTimeout ?? 30000;
-    const connectTimeout = opts.timeout?.connectTimeout ?? 30000;
+    const socketTimeout = opts.timeout?.socketTimeout ?? 300000;
+    const connectTimeout = opts.timeout?.connectTimeout ?? 300000;
     const isResuming = existingSize > 0;
     // Notify about incomplete file detection
     if (isResuming && opts.onIncompleteDetected && opts.expectedSize) {

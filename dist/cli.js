@@ -32503,8 +32503,8 @@ function validatePartialFile(filePath, expectedSize) {
 function attemptDownload(opts, existingSize, retryAttempt) {
   const uri = new import_node_url.URL(opts.url);
   const resolvedDestination = opts.destinationPath ?? path.basename(uri.pathname ?? opts.url);
-  const socketTimeout = opts.timeout?.socketTimeout ?? 3e4;
-  const connectTimeout = opts.timeout?.connectTimeout ?? 3e4;
+  const socketTimeout = opts.timeout?.socketTimeout ?? 3e5;
+  const connectTimeout = opts.timeout?.connectTimeout ?? 3e5;
   const isResuming = existingSize > 0;
   if (isResuming && opts.onIncompleteDetected && opts.expectedSize) {
     opts.onIncompleteDetected(existingSize, opts.expectedSize);
