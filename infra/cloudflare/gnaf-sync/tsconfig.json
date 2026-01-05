@@ -1,17 +1,17 @@
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "declaration": false,
-        "outDir": "./dist",
-        "rootDir": ".",
-        "resolveJsonModule": true,
-        "types": ["node"]
-    },
-    "include": ["*.ts"],
-    "exclude": ["node_modules", "dist"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["*.ts", "src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

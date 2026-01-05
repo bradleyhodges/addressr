@@ -15,9 +15,11 @@
         "@aws-sdk/lib-storage": "^3.700.0"
     },
     "devDependencies": {
+        "@cloudflare/workers-types": "^4.20241127.0",
         "@types/node": "^22.0.0",
         "tsx": "^4.19.0",
-        "typescript": "^5.7.0"
+        "typescript": "^5.7.0",
+        "wrangler": "^3.90.0"
     },
     "engines": {
         "node": ">=20.0.0"

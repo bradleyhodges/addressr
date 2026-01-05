@@ -1,0 +1,38 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# G-NAF Sync Trigger Worker
+# ═══════════════════════════════════════════════════════════════════════════════
+# A lightweight worker that checks for G-NAF updates and triggers GitHub Actions.
+#
+# This worker runs on a monthly schedule and:
+# 1. Checks data.gov.au for the latest G-NAF metadata
+# 2. Compares with the current mirror
+# 3. Triggers a GitHub Actions workflow if updates are available
+#
+# The actual sync is performed by GitHub Actions (which has no time limits).
+#
+# Setup:
+#   1. Add secrets: wrangler secret put GITHUB_TOKEN
+#   2. Deploy: pnpm run deploy
+#
+# Required Secrets:
+#   - GITHUB_TOKEN: GitHub PAT with `actions:write` permission
+#   - GITHUB_REPO: Repository in "owner/repo" format
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name = "gnaf-sync-trigger"
+main = "src/trigger-worker.ts"
+compatibility_date = "2024-11-01"
+
+# Cron trigger - runs on the 18th of every month at 06:00 UTC
+# G-NAF is released quarterly (Feb, May, Aug, Nov), usually mid-month
+[triggers]
+crons = ["0 6 18 * *"]
+
+# Environment variables
+[vars]
+MIRROR_CONFIG_URL = "https://dl.addresskit.com.au/package_show.conf.json"
+
+# Production environment
+[env.production]
+name = "gnaf-sync-trigger"
+
