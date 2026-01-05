@@ -22,6 +22,8 @@ export type JsonApiMeta = {
     responseTime?: number;
     /** API version string */
     apiVersion?: string;
+    /** Warning message for edge cases (e.g., empty dataset, no results) */
+    warning?: string;
     /** Additional arbitrary metadata */
     [key: string]: unknown;
 };

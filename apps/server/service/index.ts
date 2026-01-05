@@ -15,6 +15,7 @@ import {
 } from "./conf";
 import { CACHE_ENABLED, VERBOSE } from "./config";
 import {
+    API_WARNINGS,
     type CachedSearchResult,
     CircuitOpenError,
     ErrorDocuments,
@@ -157,6 +158,29 @@ const validatePaginationParams = (
  */
 const normalizeSearchString = (searchString: string | undefined): string =>
     (searchString ?? "").trim().replace(/\s+/g, " ");
+
+/**
+ * Checks if the address index is empty (contains no documents).
+ *
+ * This function queries OpenSearch for the total document count in the address
+ * index. Used to provide helpful warnings when users query an empty dataset.
+ *
+ * @returns A promise resolving to true if the index is empty or doesn't exist, false otherwise.
+ */
+const isIndexEmpty = async (): Promise<boolean> => {
+    try {
+        const circuit = getOpenSearchCircuit();
+        const countResponse = await circuit.execute(async () => {
+            return await (global.esClient as Types.OpensearchClient).count({
+                index: ES_INDEX_NAME,
+            });
+        });
+        return countResponse.body.count === 0;
+    } catch {
+        // If we can't determine the count (index not found, etc.), assume empty
+        return true;
+    }
+};
 
 /**
  * Searches for an address in the index with fuzzy matching.
@@ -561,8 +585,24 @@ const getAddresses = async (
             type: "text/html",
         };
 
-        // Build JSON:API pagination metadata
-        const meta = buildPaginationMeta(totalHits, page, size);
+        // Determine if a warning should be included in the response
+        let warning: string | undefined;
+        if (totalHits === 0) {
+            // Check if the entire dataset is empty vs. just no results for this query
+            const datasetEmpty = await isIndexEmpty();
+            warning = datasetEmpty
+                ? API_WARNINGS.EMPTY_DATASET
+                : API_WARNINGS.NO_RESULTS;
+        }
+
+        // Build JSON:API pagination metadata (with optional warning)
+        const meta = buildPaginationMeta(
+            totalHits,
+            page,
+            size,
+            undefined,
+            warning,
+        );
 
         // Build the complete JSON:API document
         const jsonApiDocument = buildAutocompleteDocument(

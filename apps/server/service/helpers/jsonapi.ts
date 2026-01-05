@@ -161,12 +161,24 @@ export const buildPaginationLinks = (
 };
 
 /**
+ * Warning message constants for API responses.
+ */
+export const API_WARNINGS = {
+    /** Warning when the address dataset is empty (no addresses loaded) */
+    EMPTY_DATASET:
+        "No addresses are currently loaded in the dataset. Please run the data loader to populate the address index.",
+    /** Warning when a search query returns no matching results */
+    NO_RESULTS: "No addresses matched your search query.",
+} as const;
+
+/**
  * Builds metadata for a paginated collection response.
  *
  * @param total - Total number of resources matching the query.
  * @param page - Current page number (1-indexed).
  * @param pageSize - Number of items per page.
  * @param responseTime - Optional query processing time in milliseconds.
+ * @param warning - Optional warning message to include in meta.
  * @returns JSON:API meta object with pagination information.
  */
 export const buildPaginationMeta = (
@@ -174,6 +186,7 @@ export const buildPaginationMeta = (
     page: number,
     pageSize: number,
     responseTime?: number,
+    warning?: string,
 ): JsonApiMeta => {
     const totalPages = Math.ceil(total / pageSize);
 
@@ -183,6 +196,7 @@ export const buildPaginationMeta = (
         pageSize,
         totalPages,
         ...(responseTime !== undefined && { responseTime }),
+        ...(warning !== undefined && { warning }),
     };
 };
 
@@ -288,6 +302,24 @@ export const ErrorDocuments = {
                 detail,
                 "INVALID_REQUEST",
                 paramName ? { parameter: paramName } : undefined,
+            ),
+        ]);
+    },
+
+    /**
+     * Builds a 400 Bad Request error document for missing required parameter.
+     *
+     * @param paramName - The name of the missing required parameter.
+     * @returns JSON:API error document for missing parameter.
+     */
+    missingRequiredParameter: (paramName: string): JsonApiErrorDocument => {
+        return buildErrorDocument([
+            buildError(
+                "400",
+                "Bad Request",
+                `The '${paramName}' query parameter is required and must not be empty.`,
+                "MISSING_REQUIRED_PARAMETER",
+                { parameter: paramName },
             ),
         ]);
     },

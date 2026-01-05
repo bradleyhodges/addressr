@@ -261,6 +261,10 @@ definitions:
         type: integer
         description: Query processing time in milliseconds
         example: 45
+      warning:
+        type: string
+        description: Optional warning message (e.g., when dataset is empty or no results found)
+        example: No addresses matched your search query.
   
   JsonApiError:
     type: object
