@@ -56,7 +56,7 @@ services:
       args:
         PACKAGE: "@bradleyhodges/addresskit"
         VERSION: "${VERSION:-latest}"
-        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.2.6}.tgz"
+        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.4.4}.tgz"
         BUILD_DATE: "${BUILD_DATE:-}"
         VCS_REF: "${VCS_REF:-}"
     container_name: addresskit-dev-loader
@@ -98,7 +98,7 @@ services:
       args:
         PACKAGE: "@bradleyhodges/addresskit"
         VERSION: "${VERSION:-latest}"
-        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.2.6}.tgz"
+        PACKAGE_TGZ: "bradleyhodges-addresskit-${VERSION:-2.4.4}.tgz"
         BUILD_DATE: "${BUILD_DATE:-}"
         VCS_REF: "${VCS_REF:-}"
     container_name: addresskit-dev-api

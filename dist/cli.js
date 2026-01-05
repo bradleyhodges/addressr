@@ -39,7 +39,7 @@ var version;
 var init_version = __esm({
   "packages/core/version.ts"() {
     "use strict";
-    version = "2.4.3";
+    version = "2.4.4";
   }
 });
 
@@ -67114,6 +67114,116 @@ async function loadAddressCollection(params) {
     }
   };
 }
+function mapLocalitySearchHitToResource(hit, maxScore) {
+  const localityId = hit._id.replace("/localities/", "");
+  const normalizedRank = maxScore > 0 ? hit._score / maxScore : 0;
+  return {
+    type: "locality-suggestion",
+    id: localityId,
+    attributes: {
+      display: hit._source.display,
+      rank: Math.round(normalizedRank * 100) / 100
+    },
+    links: {
+      self: `/localities/${localityId}`
+    }
+  };
+}
+async function loadLocalityItem({
+  localityPid
+}) {
+  if (typeof localityPid !== "string" || localityPid.length === 0) {
+    throw new Error("Locality PID is required to load a record.");
+  }
+  const { json, hash, statusCode } = await getLocality(
+    localityPid
+  );
+  return {
+    body: json,
+    headers: {
+      etag: `"${version}-${hash}"`,
+      "cache-control": `public, max-age=${ONE_WEEK}`
+    },
+    status: statusCode ?? 200
+  };
+}
+async function loadLocalityCollection(params) {
+  const { page, q } = params;
+  const resolvedPage = Number(page ?? 0);
+  if (!Number.isFinite(resolvedPage)) {
+    throw new Error("Search page value must be numeric.");
+  }
+  const baseUrl = `/localities${q ? `?q=${encodeURIComponent(q)}` : ""}`;
+  if (q && q.length > 1) {
+    logger6("Searching for localities with query:", q);
+    const searchResult = await searchForLocality(
+      q,
+      resolvedPage + 1,
+      pageSize
+    );
+    const hits = searchResult.searchResponse.body.hits.hits;
+    const totalHits = searchResult.totalHits;
+    const totalPages = Math.ceil(totalHits / pageSize);
+    const currentPage = resolvedPage + 1;
+    const maxScore = hits.length > 0 ? hits[0]._score : 1;
+    const data = hits.map(
+      (hit) => mapLocalitySearchHitToResource(hit, maxScore)
+    );
+    const jsonApiDocument = {
+      jsonapi: { version: "1.1" },
+      data,
+      links: {
+        self: `${baseUrl}${currentPage > 1 ? `&page[number]=${currentPage}` : ""}`,
+        first: baseUrl,
+        ...currentPage > 1 && {
+          prev: currentPage === 2 ? baseUrl : `${baseUrl}&page[number]=${currentPage - 1}`
+        },
+        ...currentPage < totalPages && {
+          next: `${baseUrl}&page[number]=${currentPage + 1}`
+        },
+        ...totalPages > 0 && {
+          last: totalPages === 1 ? baseUrl : `${baseUrl}&page[number]=${totalPages}`
+        }
+      },
+      meta: {
+        total: totalHits,
+        page: currentPage,
+        pageSize,
+        totalPages
+      }
+    };
+    const responseHash = (0, import_node_crypto.createHash)("md5").update(JSON.stringify(jsonApiDocument)).digest("hex");
+    return {
+      body: jsonApiDocument,
+      hasMore: currentPage < totalPages,
+      headers: {
+        etag: `"${version}-${responseHash}"`,
+        "cache-control": `public, max-age=${ONE_WEEK}`
+      }
+    };
+  }
+  const emptyDocument = {
+    jsonapi: { version: "1.1" },
+    data: [],
+    links: {
+      self: baseUrl
+    },
+    meta: {
+      total: 0,
+      page: 1,
+      pageSize,
+      totalPages: 0
+    }
+  };
+  return {
+    body: emptyDocument,
+    hasMore: false,
+    headers: {
+      etag: `"${version}"`,
+      "cache-control": `public, max-age=${ONE_WEEK}`
+    }
+  };
+}
 function transformPaginationParams(req, _res, next) {
   const pageParam = req.query.page;
   if (pageParam && typeof pageParam === "object" && pageParam.number) {
@@ -67158,10 +67268,24 @@ async function startRest2Server() {
       }
     ]
   });
+  const localitiesType = waycharter.registerCollection({
+    itemPath: "/:localityPid",
+    itemLoader: loadLocalityItem,
+    collectionPath: "/localities",
+    collectionLoader: loadLocalityCollection,
+    filters: [
+      {
+        rel: "https://addressr.io/rels/locality-search",
+        parameters: ["q"]
+      }
+    ]
+  });
   const loadIndexResource = async () => {
+    const addressLinks = addressesType.additionalPaths;
+    const localityLinks = localitiesType.additionalPaths;
     return {
       body: {},
-      links: addressesType.additionalPaths,
+      links: [...addressLinks, ...localityLinks],
       headers: {
         etag: `"${version}"`,
         "cache-control": `public, max-age=${ONE_WEEK}`
@@ -67283,6 +67407,20 @@ async function runStartCommand(options) {
     );
     console.log(
       `       ${theme.dim("Get detailed information for a specific address")}`
+    );
+    console.log();
+    console.log(
+      `  ${theme.secondary("GET")}  ${theme.muted("/localities?q=<query>")}`
+    );
+    console.log(
+      `       ${theme.dim("Search for suburbs/postcodes matching the query")}`
+    );
+    console.log();
+    console.log(
+      `  ${theme.secondary("GET")}  ${theme.muted("/localities/:id")}`
+    );
+    console.log(
+      `       ${theme.dim("Get detailed information for a specific locality")}`
     );
     console.log();
     console.log(`  ${theme.secondary("GET")}  ${theme.muted("/docs")}`);

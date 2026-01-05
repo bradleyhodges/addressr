@@ -94,6 +94,12 @@ async function runStartCommand(options) {
         console.log(`  ${terminalUI_1.theme.secondary("GET")}  ${terminalUI_1.theme.muted("/addresses/:id")}`);
         console.log(`       ${terminalUI_1.theme.dim("Get detailed information for a specific address")}`);
         console.log();
+        console.log(`  ${terminalUI_1.theme.secondary("GET")}  ${terminalUI_1.theme.muted("/localities?q=<query>")}`);
+        console.log(`       ${terminalUI_1.theme.dim("Search for suburbs/postcodes matching the query")}`);
+        console.log();
+        console.log(`  ${terminalUI_1.theme.secondary("GET")}  ${terminalUI_1.theme.muted("/localities/:id")}`);
+        console.log(`       ${terminalUI_1.theme.dim("Get detailed information for a specific locality")}`);
+        console.log();
         console.log(`  ${terminalUI_1.theme.secondary("GET")}  ${terminalUI_1.theme.muted("/docs")}`);
         console.log(`       ${terminalUI_1.theme.dim("OpenAPI/Swagger documentation")}`);
         console.log();

@@ -230,6 +230,149 @@ async function loadAddressCollection(params) {
     };
 }
 /**
+ * Maps a raw locality search hit into a JSON:API autocomplete resource.
+ *
+ * @param {LocalitySearchHit} hit - Search hit returned by the backing index.
+ * @param {number} maxScore - The maximum score for normalization.
+ * @returns {LocalitySuggestionResource} JSON:API resource for autocomplete.
+ */
+function mapLocalitySearchHitToResource(hit, maxScore) {
+    const localityId = hit._id.replace("/localities/", "");
+    // Normalize score to 0-1 range relative to the best match
+    const normalizedRank = maxScore > 0 ? hit._score / maxScore : 0;
+    return {
+        type: "locality-suggestion",
+        id: localityId,
+        attributes: {
+            display: hit._source.display,
+            rank: Math.round(normalizedRank * 100) / 100,
+        },
+        links: {
+            self: `/localities/${localityId}`,
+        },
+    };
+}
+/**
+ * Loads a single locality resource by its persistent identifier.
+ *
+ * @param {LocalityLoaderParams} params - Parameters supplied by WayCharter containing the locality PID.
+ * @returns {Promise<{ body: unknown; headers: Record<string, string>; status: number; }>} Payload ready for WayCharter response handling.
+ * @throws {Error} When a locality PID is not provided.
+ */
+async function loadLocalityItem({ localityPid, }) {
+    // Fail fast when a locality PID is missing to avoid an opaque 500 from downstream services.
+    if (typeof localityPid !== "string" || localityPid.length === 0) {
+        throw new Error("Locality PID is required to load a record.");
+    }
+    // Get the locality from the Elasticsearch index.
+    const { json, hash, statusCode } = (await (0, service_1.getLocality)(localityPid));
+    // Return the locality body, headers, and status code.
+    return {
+        body: json,
+        headers: {
+            etag: `"${version_1.version}-${hash}"`,
+            "cache-control": `public, max-age=${ONE_WEEK}`,
+        },
+        status: statusCode ?? 200,
+    };
+}
+/**
+ * Retrieves a paginated collection of localities matching the supplied query.
+ * Returns a JSON:API formatted document.
+ *
+ * @param {LocalityCollectionParams} params - Pagination and query parameters from WayCharter.
+ * @returns {Promise<{ body: LocalityAutocompleteDocument; hasMore: boolean; headers: Record<string, string>; }>} JSON:API collection response.
+ * @throws {Error} When the provided page value cannot be parsed as a number.
+ */
+async function loadLocalityCollection(params) {
+    const { page, q } = params;
+    // Accept numeric strings from query params while rejecting non-numeric input.
+    const resolvedPage = Number(page ?? 0);
+    if (!Number.isFinite(resolvedPage)) {
+        throw new Error("Search page value must be numeric.");
+    }
+    // Build base URL for pagination links
+    const baseUrl = `/localities${q ? `?q=${encodeURIComponent(q)}` : ""}`;
+    // If the query is defined and longer than 1 character, search for localities.
+    if (q && q.length > 1) {
+        logger("Searching for localities with query:", q);
+        // Query length guard prevents expensive searches on very short strings.
+        const searchResult = (await (0, service_1.searchForLocality)(q, resolvedPage + 1, pageSize));
+        // Extract hits from the nested searchResponse structure
+        const hits = searchResult.searchResponse.body.hits.hits;
+        const totalHits = searchResult.totalHits;
+        const totalPages = Math.ceil(totalHits / pageSize);
+        const currentPage = resolvedPage + 1;
+        // Get max score for normalization (first hit typically has highest score)
+        const maxScore = hits.length > 0 ? hits[0]._score : 1;
+        // Map the search hits to JSON:API resources
+        const data = hits.map((hit) => mapLocalitySearchHitToResource(hit, maxScore));
+        // Build JSON:API document
+        const jsonApiDocument = {
+            jsonapi: { version: "1.1" },
+            data,
+            links: {
+                self: `${baseUrl}${currentPage > 1 ? `&page[number]=${currentPage}` : ""}`,
+                first: baseUrl,
+                ...(currentPage > 1 && {
+                    prev: currentPage === 2
+                        ? baseUrl
+                        : `${baseUrl}&page[number]=${currentPage - 1}`,
+                }),
+                ...(currentPage < totalPages && {
+                    next: `${baseUrl}&page[number]=${currentPage + 1}`,
+                }),
+                ...(totalPages > 0 && {
+                    last: totalPages === 1
+                        ? baseUrl
+                        : `${baseUrl}&page[number]=${totalPages}`,
+                }),
+            },
+            meta: {
+                total: totalHits,
+                page: currentPage,
+                pageSize,
+                totalPages,
+            },
+        };
+        // Create a hash of the body to use as the ETag.
+        const responseHash = (0, node_crypto_1.createHash)("md5")
+            .update(JSON.stringify(jsonApiDocument))
+            .digest("hex");
+        // Return the JSON:API document, hasMore, and headers.
+        return {
+            body: jsonApiDocument,
+            hasMore: currentPage < totalPages,
+            headers: {
+                etag: `"${version_1.version}-${responseHash}"`,
+                "cache-control": `public, max-age=${ONE_WEEK}`,
+            },
+        };
+    }
+    // Empty query responses still carry cache headers for intermediary caches.
+    const emptyDocument = {
+        jsonapi: { version: "1.1" },
+        data: [],
+        links: {
+            self: baseUrl,
+        },
+        meta: {
+            total: 0,
+            page: 1,
+            pageSize,
+            totalPages: 0,
+        },
+    };
+    return {
+        body: emptyDocument,
+        hasMore: false,
+        headers: {
+            etag: `"${version_1.version}"`,
+            "cache-control": `public, max-age=${ONE_WEEK}`,
+        },
+    };
+}
+/**
  * Starts the REST server and registers hypermedia resources.
  *
  * @returns {Promise<string>} The base URL where the server is listening.
@@ -294,15 +437,31 @@ async function startRest2Server() {
             },
         ],
     });
+    // Register the localities collection.
+    const localitiesType = waycharter.registerCollection({
+        itemPath: "/:localityPid",
+        itemLoader: loadLocalityItem,
+        collectionPath: "/localities",
+        collectionLoader: loadLocalityCollection,
+        filters: [
+            {
+                rel: "https://addressr.io/rels/locality-search",
+                parameters: ["q"],
+            },
+        ],
+    });
     /**
      * Builds the API index resource, exposing links to available collections.
      *
      * @returns {Promise<{ body: Record<string, never>; links: unknown; headers: Record<string, string>; }>} Index payload with cache headers.
      */
     const loadIndexResource = async () => {
+        // Combine links from both collections
+        const addressLinks = addressesType.additionalPaths;
+        const localityLinks = localitiesType.additionalPaths;
         return {
             body: {},
-            links: addressesType.additionalPaths,
+            links: [...addressLinks, ...localityLinks],
             headers: {
                 etag: `"${version_1.version}"`,
                 "cache-control": `public, max-age=${ONE_WEEK}`,
