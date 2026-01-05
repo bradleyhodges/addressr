@@ -366,7 +366,7 @@ async function release() {
     if (!args.skipNpm) {
         logSection("Publishing to npm");
         log("📤", "Publishing to npmjs.com...", colors.blue);
-        const npmResult = exec("npm publish --access public");
+        const npmResult = exec(`npm publish ${tarballName} --access public`);
         if (npmResult.success) {
             results.npm = { status: "success", message: "" };
             log("✓", "Published to npm", colors.green);
@@ -398,7 +398,7 @@ async function release() {
         logSection("Publishing to GitHub Packages");
         log("📤", "Publishing to npm.pkg.github.com...", colors.blue);
         const githubResult = exec(
-            "npm publish --access public --registry=https://npm.pkg.github.com",
+            `npm publish ${tarballName} --access public --registry=https://npm.pkg.github.com`,
         );
         if (githubResult.success) {
             results.github = { status: "success", message: "" };
